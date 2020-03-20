@@ -3,7 +3,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import java.sql.DriverManager
 
 
-class UpdateBD : CliktCommand() {
+class ColloboqueClient : CliktCommand() {
     private val dbPath by option("-f", help="Path to database")
     private val command by option("-c", help="Update command")
 
@@ -18,4 +18,4 @@ class UpdateBD : CliktCommand() {
     }
 }
 
-fun main(args: Array<String>) = UpdateBD().main(args)
+fun main(args: Array<String>) = ColloboqueClient().main(args)

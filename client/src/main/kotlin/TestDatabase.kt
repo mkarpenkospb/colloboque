@@ -1,15 +1,10 @@
 import java.sql.DriverManager
-import java.sql.ResultSet
 
-
-
-
-fun main(args: Array<String>) {
-    createFirst()
-}
-
+/**
+ * example of some simple queries
+ */
 fun createFirst() {
-    val url = "jdbc:h2:mem:"
+    val url = "jdbc:h2:~/bd1"
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
@@ -23,8 +18,8 @@ fun createFirst() {
             """
             stmt.executeUpdate(sql)
             stmt.executeUpdate("""
-            INSERT INTO REGISTRATION(id, first, last, age) 
-            VALUES(1, 'Maria', 'Karpenko', 26 )
+            INSERT INTO REGISTRATION(id, first, last, age)
+            VALUES(2, 'Adam', 'Smith', 44 )
             """)
             stmt.executeQuery("SELECT * from REGISTRATION").use { res ->
                 while (res.next()) {
