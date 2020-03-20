@@ -10,24 +10,26 @@ fun main(args: Array<String>) {
 
 fun createFirst() {
     val url = "jdbc:h2:mem:"
-    val conn = DriverManager.getConnection(url)
-    val stmt = conn.createStatement()
-    val sql =
-     """
+    DriverManager.getConnection(url).use {
+        val stmt = it.createStatement()
+        val sql =
+         """
          CREATE TABLE   REGISTRATION
         (id INTEGER not NULL,
          first VARCHAR(255),
          last VARCHAR(255),
          age INTEGER,
          PRIMARY KEY ( id ))
-     """
-    stmt.executeUpdate(sql)
-    stmt.executeUpdate("""
-        INSERT INTO REGISTRATION(id, first, last, age) VALUES(1, 'Maria', 'Karpenko', 26 )
-    """)
-    val res = stmt.executeQuery("SELECT * from REGISTRATION")
-    while (res.next()) {
-        println("${res.getString(1)}  ${res.getString(2)}  ${res.getString(3)}  ${res.getString(4)}")
+        """
+        stmt.executeUpdate(sql)
+        stmt.executeUpdate("""
+        INSERT INTO REGISTRATION(id, first, last, age) 
+        VALUES(1, 'Maria', 'Karpenko', 26 )
+        """)
+        val res = stmt.executeQuery("SELECT * from REGISTRATION")
+        while (res.next()) {
+            println("${res.getString(1)}  ${res.getString(2)}  ${res.getString(3)}  ${res.getString(4)}")
+        }
     }
 }
 
