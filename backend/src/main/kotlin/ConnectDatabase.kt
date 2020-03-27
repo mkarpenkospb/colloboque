@@ -1,34 +1,31 @@
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.zaxxer.hikari.HikariDataSource
 
 
+
 class ConnectDatabase : CliktCommand() {
-    private val host by option("-h", help="host")
-    private val portName by option("-p", help="Name of the port").int()
-    private val dataBase by option("-d", help="Name of the database")
-    private val user by option("-u", help="Username")
-    private val password by option("-pwd", help="User password")
+    private val host by option("--pg-host", help="host").default("localhost")
+    private val port by option("--pg-port", help="Number of the port").int().default(5432)
+    private val dataBase by option("--pg-database", help="Name of the database").default("postgres")
+    private val user by option("--pg-user", help="User name").default("postgres")
+    private val password by option("--pg-password", help="User password").default("123")
 
     override fun run() {
-        connectPostgres(host, portName, dataBase, user, password);
+        connectPostgres(host, port, dataBase, user, password);
     }
 }
 
 
-fun connectPostgres(host: String?, portName: Int?, dataBase: String?, user: String?, password: String?) {
-    var port: String = ""
-    if (portName != null)
-        port = ":$portName"
+fun connectPostgres(host: String, port: Int, dataBase: String, user: String, password: String) {
 
-    val url = "jdbc:postgresql://$host$port/$dataBase"
+    val url = "jdbc:postgresql://$host:$port/$dataBase"
 
     val ds = HikariDataSource()
     ds.jdbcUrl = url
     ds.username = user
-    if (password != null)
-        ds.password = password
-}
+    ds.password = password
 
-fun main(args: Array<String>) = ConnectDatabase().main(args)
+}
