@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = '5.3.1'
+    ext.junit_version = '5.3.1'
 }
 
 plugins {
@@ -16,8 +16,8 @@ repositories {
 
 
 dependencies {
-    testImplementation group:  'org.junit.jupiter', name: 'junit-jupiter-api', version: "$kotlin_version"
-    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$kotlin_version"
+    testImplementation group:  'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
     implementation group: 'com.github.ajalt', name: 'clikt', version: '2.6.0'
     implementation group: 'com.h2database', name: 'h2', version: '1.4.200'
