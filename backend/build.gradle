@@ -25,6 +25,7 @@ dependencies {
     implementation group: 'com.github.ajalt', name: 'clikt', version: '2.6.0'
     implementation group: 'com.zaxxer', name: 'HikariCP', version: '2.+'
     implementation group: 'org.postgresql', name: 'postgresql', version: '42.+'
+//    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-jdbc', version: '0.5.748'
 }
 
 compileKotlin {

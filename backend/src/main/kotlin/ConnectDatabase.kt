@@ -1,25 +1,9 @@
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.types.int
 import com.zaxxer.hikari.HikariDataSource
+import java.sql.ResultSetMetaData
 
 
-
-class ConnectDatabase : CliktCommand() {
-    private val host by option("--pg-host", help="host").default("localhost")
-    private val port by option("--pg-port", help="Number of the port").int().default(5432)
-    private val dataBase by option("--pg-database", help="Name of the database").default("postgres")
-    private val user by option("--pg-user", help="User name").default("postgres")
-    private val password by option("--pg-password", help="User password").default("123")
-
-    override fun run() {
-        connectPostgres(host, port, dataBase, user, password);
-    }
-}
-
-
-fun connectPostgres(host: String, port: Int, dataBase: String, user: String, password: String) {
+fun connectPostgres(host: String?, port: Int?,
+                    dataBase: String?, user: String?, password: String?): HikariDataSource {
 
     val url = "jdbc:postgresql://$host:$port/$dataBase"
 
@@ -28,4 +12,43 @@ fun connectPostgres(host: String, port: Int, dataBase: String, user: String, pas
     ds.username = user
     ds.password = password
 
+    return ds
+}
+
+
+fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): String {
+
+    val query =
+            """
+                SELECT * FROM $tableName
+            """
+
+    val buff = StringBuffer()
+    val colNames: ArrayList<String> = ArrayList()
+
+    ds.connection.use { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery(query).use {rs ->
+                val rsmd: ResultSetMetaData = rs.metaData
+                for (i in 1..rsmd.columnCount) {
+                    val colName = rsmd.getColumnName(i);
+                    buff.append(colName)
+                    if (i < rsmd.columnCount)
+                        buff.append(',')
+                    colNames.add(colName)
+                }
+                buff.append('\n')
+                while (rs.next()) {
+                    for (i in 1..rsmd.columnCount) {
+                        buff.append(rs.getString(i))
+                        if (i < rsmd.columnCount)
+                            buff.append(',')
+                    }
+                    buff.append('\n')
+                }
+            }
+        }
+    }
+
+    return buff.toString()
 }
