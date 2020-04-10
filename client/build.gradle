@@ -20,13 +20,10 @@ dependencies {
     testImplementation group:  'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
     testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
-    implementation group: 'io.ktor', name: 'ktor-server-core', version: "$ktor_version"
-    implementation group: 'io.ktor', name: 'ktor-server-netty', version: "$ktor_version"
     implementation group: 'io.ktor', name: 'ktor-gson', version: "$ktor_version"
     implementation group:'io.ktor', name: 'ktor-client-apache', version: "$ktor_version"
     implementation group: 'com.github.ajalt', name: 'clikt', version: '2.6.0'
     implementation group: 'com.h2database', name: 'h2', version: '1.4.200'
-//    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-jdbc', version: '0.5.748'
 }
 
 compileKotlin {

@@ -17,8 +17,6 @@ import java.io.File
 
 class ColloboqueClient : CliktCommand() {
 
-    private val host by option("--pg-host", help="host").default("localhost")
-    private val port by option("--pg-port", help="Number of the port").int().default(5432)
     private val dbServer by option("--pg-database", help="Name of the database").default("postgres")
     private val user by option("--pg-user", help="User name").default("postgres")
     private val password by option("--pg-password", help="User password").default("123")
@@ -30,14 +28,14 @@ class ColloboqueClient : CliktCommand() {
 
     override fun run() {
         val url = "jdbc:h2:~/$dbClient"
-        startClient(serverIp, serverPort, host, port, dbServer, user, password, tablePsql)
+        startClient(serverIp, serverPort,dbServer, user, password, tablePsql)
         importTable(url, tableH2, "/tmp/recieved.csv")
     }
 
 }
 
 
-fun startClient(ip : String, serverPort : Int, host: String, port : Int, dbServer : String,
+fun startClient(ip : String, serverPort : Int, dbServer : String,
                 user : String, password : String, table : String?) {
     runBlocking {
         val client = HttpClient(Apache) {
@@ -45,8 +43,8 @@ fun startClient(ip : String, serverPort : Int, host: String, port : Int, dbServe
         }
 
         val url: String =
-                """http://$ip:$serverPort/table?host=$host&
-                port=$port&database=$dbServer&user=$user&password=$password&
+                """http://$ip:$serverPort/table?database=$dbServer&
+                user=$user&password=$password&
                 table=$table""".filter {c-> !Character.isWhitespace(c) }
 
         client.getAsTempFile(url) { file ->

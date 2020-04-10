@@ -1,4 +1,7 @@
+import com.opencsv.CSVWriter
 import com.zaxxer.hikari.HikariDataSource
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.sql.ResultSetMetaData
 
 
@@ -16,39 +19,44 @@ fun connectPostgres(host: String?, port: Int?,
 }
 
 
-fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): String {
+fun loadTableFromDB(ds : HikariDataSource, tableName : String? ) {
 
     val query =
             """
                 SELECT * FROM $tableName
             """
 
-    val buff = StringBuffer()
-    val colNames: ArrayList<String> = ArrayList()
+    val queryCsv = "/tmp/saveClientQuery.csv";
 
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
             stmt.executeQuery(query).use {rs ->
                 val rsmd: ResultSetMetaData = rs.metaData
+
+                val colNames = arrayOfNulls<String>(rsmd.columnCount)
+
                 for (i in 1..rsmd.columnCount) {
-                    val colName = rsmd.getColumnName(i);
-                    buff.append(colName)
-                    if (i < rsmd.columnCount)
-                        buff.append(',')
-                    colNames.add(colName)
+                    colNames[i-1] = rsmd.getColumnName(i)
                 }
-                buff.append('\n')
-                while (rs.next()) {
-                    for (i in 1..rsmd.columnCount) {
-                        buff.append(rs.getString(i))
-                        if (i < rsmd.columnCount)
-                            buff.append(',')
+
+                Files.newBufferedWriter(Paths.get(queryCsv)).use { writer ->
+                    CSVWriter(writer,
+                            CSVWriter.DEFAULT_SEPARATOR,
+                            CSVWriter.NO_QUOTE_CHARACTER,
+                            CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+                            CSVWriter.DEFAULT_LINE_END).use { csvWriter ->
+
+                        csvWriter.writeNext(colNames)
+                        while (rs.next()) {
+                            val getLine = arrayOfNulls<String>(rsmd.columnCount)
+                            for (i in 1..rsmd.columnCount) {
+                                getLine[i - 1] = rs.getString(i)
+                            }
+                            csvWriter.writeNext(getLine)
+                        }
                     }
-                    buff.append('\n')
                 }
             }
         }
     }
-
-    return buff.toString()
 }

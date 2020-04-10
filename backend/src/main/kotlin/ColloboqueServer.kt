@@ -1,25 +1,28 @@
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
-import com.zaxxer.hikari.HikariDataSource
 import io.ktor.application.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import java.io.File
 
 
 class ColloboqueServer : CliktCommand() {
-    private val portName by option("-p", help="Name of the port").int()
+    private val portName by option("--server-port", help="Name of the port").int()
+    private val host by option("--pg-host", help="host").default("localhost")
+    private val port by option("--pg-port", help="Number of the port").int().default(5432)
 
     override fun run() {
-        portName?.let { startServer(it) }
+        portName?.let { startServer(it, host, port) }
     }
 
 }
 
 
-fun startServer(portName: Int) {
+fun startServer(portName: Int, host: String, port : Int) {
     val server = embeddedServer(Netty, port = portName) {
         routing {
             get("/") {
@@ -27,17 +30,15 @@ fun startServer(portName: Int) {
             }
             get("/table") {
 
-                val host = call.parameters["host"]
-                val port = call.parameters["port"]?.toInt()
                 val database = call.parameters["database"]
                 val user = call.parameters["user"]
                 val password = call.parameters["password"]
                 val table = call.parameters["table"]
 
                 val ds = connectPostgres(host, port, database, user, password)
-                val responseString = loadTableFromDB(ds, table)
+                loadTableFromDB(ds, table)
 
-                call.respondText(responseString)
+                call.respondFile(File("/tmp/saveClientQuery.csv"))
             }
         }
     }
