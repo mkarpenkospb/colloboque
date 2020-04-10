@@ -7,18 +7,14 @@ import io.ktor.client.engine.apache.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.cio.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.*
 import java.io.*
 import java.net.*
 import java.io.File
-import java.lang.IllegalArgumentException
 
 
 class ColloboqueClient : CliktCommand() {
 
-    private val databaseName by option("--pg-database", help="Name of the database").default("postgres")
     private val user by option("--pg-user", help="User name").default("postgres")
     private val password by option("--pg-password", help="User password").default("123")
     private val databaseLocal by option("--h2-database", help="Path to client h2 database")
@@ -28,34 +24,54 @@ class ColloboqueClient : CliktCommand() {
     private val serverIp by option("--server-ip", help="Server address").default("127.0.0.1")
 
     override fun run() {
-        val url = "jdbc:h2:/home/${System.getProperty("user.name")}/$databaseLocal"
-        startClient(serverIp, serverPort, databaseName, user, password,
-                tablePsql ?: throw IllegalArgumentException("Table name expected"))
-        importTable(url, tableH2, "/tmp/recieved.csv")
-    }
 
-}
-
-
-fun startClient(ip : String, serverPort : Int, databaseName : String,
-                user : String, password : String, table : String) {
-    runBlocking {
         val client = HttpClient(Apache) {
             followRedirects = true
         }
 
-        val url: String =
-                """http://$ip:$serverPort/table?database=$databaseName&
-                |user=$user&password=$password&table=$table""".trimMargin()
-                        .replace("\n", "")
+        /* Probably two different programmes?*/
+        loadTableFromServer(client, serverIp, serverPort, user, password,
+                tablePsql ?: throw IllegalArgumentException("Table name expected"),
+                tableH2 ?: throw IllegalArgumentException("Table name expected"),
+                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
-        File("/tmp/recieved.csv").writeBytes(client.getAsTempFile(url).toByteArray())
+
+//        updateTableOnServer(client, serverIp, serverPort, user, password)
+    }
+
+}
+
+fun loadTableFromServer(client: HttpClient, ip : String, serverPort : Int, user : String,
+                        password : String, table : String, tableH2: String, databaseLocal: String) {
+    runBlocking {
+        val url: String = "http://$ip:$serverPort/table?user=$user&password=$password&table=$table"
+
+        val localUrl = "jdbc:h2:$databaseLocal"
+
+        importTable(localUrl, tableH2, client.getAsTempFile(url))
     }
 }
 
+fun updateTableOnServer(client: HttpClient, ip : String, serverPort : Int, user : String, password : String) {
+    runBlocking {
+        val url = "http://$ip:$serverPort/update?user=$user&password=$password"
+        val queries = UpdateServerDatabase()
+        sendPostUpdate(url, queries, client)
+    }
+}
+
+
+suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
+    val call = client.post<String>(url) {
+        body = queries
+    }
+}
+
+
+
 data class HttpClientException(val response: HttpResponse) : IOException("HTTP Error ${response.status}")
 
-suspend fun HttpClient.getAsTempFile(url: String): ByteArrayOutputStream {
+suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
     val fileByteArray = ByteArrayOutputStream()
     val response = request<HttpResponse> {
         url(URL(url))
@@ -66,7 +82,7 @@ suspend fun HttpClient.getAsTempFile(url: String): ByteArrayOutputStream {
     }
 
     fileByteArray.writeBytes(response.readBytes())
-    return fileByteArray
+    return fileByteArray.toByteArray()
 }
 
 fun main(args: Array<String>) = ColloboqueClient().main(args)

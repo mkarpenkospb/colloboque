@@ -3,13 +3,13 @@ import com.zaxxer.hikari.HikariDataSource
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.sql.ResultSetMetaData
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 
 
-fun connectPostgres(host: String?, port: Int?,
-                    dataBase: String?, user: String?, password: String?): HikariDataSource {
+fun connectPostgres(host: String, port: Int,
+                    dataBase: String, user: String, password: String): HikariDataSource {
 
     val url = "jdbc:postgresql://$host:$port/$dataBase"
 
@@ -21,17 +21,32 @@ fun connectPostgres(host: String?, port: Int?,
     return ds
 }
 
+data class UpdatePost(val statements: Array<String>)
 
-fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): ByteArrayOutputStream {
-
-    val query =
-            """
-                SELECT * FROM $tableName
-            """
-    val queryByteArray = ByteArrayOutputStream()
+fun UpdateDataBase(ds: HikariDataSource, jsonQueries: String) {
+    val mapper = jacksonObjectMapper()
+    val update: UpdatePost = mapper.readValue(jsonQueries)
 
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
+            for (q in update.statements) {
+                stmt.execute(q)
+            }
+        }
+    }
+
+}
+
+
+
+fun loadTableFromDB(ds : HikariDataSource, tableName : String ): ByteArrayOutputStream {
+
+   ds.connection.use { conn ->
+        conn.createStatement().use { stmt ->
+            val query =
+                """
+                SELECT * FROM $tableName
+                """
             stmt.executeQuery(query).use {rs ->
                 val rsmd: ResultSetMetaData = rs.metaData
 
@@ -40,6 +55,7 @@ fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): ByteArrayOutpu
                 for (i in 1..rsmd.columnCount) {
                     colNames[i-1] = rsmd.getColumnName(i)
                 }
+                val queryByteArray = ByteArrayOutputStream()
 
                 CSVWriter(BufferedWriter(OutputStreamWriter(queryByteArray)),
                         CSVWriter.DEFAULT_SEPARATOR,
@@ -55,10 +71,10 @@ fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): ByteArrayOutpu
                             }
                             csvWriter.writeNext(getLine)
                         }
+                    return queryByteArray
                     }
             }
         }
     }
-    return queryByteArray
 }
 

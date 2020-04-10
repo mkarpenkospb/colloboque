@@ -7,36 +7,54 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.request.*
+
 
 
 class ColloboqueServer : CliktCommand() {
-    private val portName by option("--server-port", help="Name of the port").int()
+    private val databaseName by option("--pg-database", help="Name of the database").default("postgres")
+    private val portNumber by option("--server-port", help="Number of the port").int().default(8080)
     private val postgresHost by option("--pg-host", help="host").default("localhost")
     private val postgresPort by option("--pg-port", help="Number of the port").int().default(5432)
 
     override fun run() {
-        portName?.let { startServer(it, postgresHost, postgresPort) }
+        startServer(portNumber, postgresHost, postgresPort, databaseName)
     }
 
 }
 
 
-fun startServer(portName: Int, postgresHost: String, postgresPort : Int) {
-    val server = embeddedServer(Netty, port = portName) {
+fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String) {
+    val server = embeddedServer(Netty, port = portNumber) {
         routing {
+
             get("/") {
                 call.respondText("Hello!")
+
             }
+
+            post("/update") {
+                val user = call.parameters["user"] ?: "postgres"
+                val password = call.parameters["password"] ?: "123"
+
+                val text = call.receiveText()
+                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
+
+                UpdateDataBase(ds, text)
+
+                call.respondText("Done")
+            }
+
             get("/table") {
 
-                val database = call.parameters["database"]
-                val user = call.parameters["user"]
-                val password = call.parameters["password"]
-                val table = call.parameters["table"]
+                val user = call.parameters["user"] ?: "postgres"
+                val password = call.parameters["password"] ?: "123"
+                val table = call.parameters["table"] ?: throw IllegalArgumentException("Table name expected")
 
-                val ds = connectPostgres(postgresHost, postgresPort, database, user, password)
+                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 call.respondBytes(loadTableFromDB(ds, table).toByteArray())
             }
+
         }
     }
     server.start(wait = true)

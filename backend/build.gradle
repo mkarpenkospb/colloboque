@@ -26,6 +26,8 @@ dependencies {
     implementation group: 'com.zaxxer', name: 'HikariCP', version: '3.+'
     implementation group: 'org.postgresql', name: 'postgresql', version: '42.+'
     implementation group: 'com.opencsv', name: 'opencsv', version: '4.1'
+    implementation group: 'io.ktor', name: 'ktor-html-builder', version: "$ktor_version"
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.10.2'
 }
 
 compileKotlin {

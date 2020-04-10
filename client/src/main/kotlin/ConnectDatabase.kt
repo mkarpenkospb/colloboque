@@ -1,32 +1,36 @@
 import java.sql.DriverManager
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import java.io.File
 
+fun importTable(url: String, tableName: String, tableData: ByteArray) {
 
-/**
- * example of some simple queries
- */
-fun createFirst() {
-    val url = "jdbc:h2:~/bd1"
-    DriverManager.getConnection(url).use { conn ->
-        conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT * from newtable").use { res ->
-                while (res.next()) {
-                    println("${res.getString(1)}  ${res.getString(2)}  ${res.getString(3)}  ${res.getString(4)}")
-                }
-            }
-        }
-    }
-}
+    val tmp = createTempFile()
+    tmp.writeBytes(tableData)
 
-
-fun importTable(url: String, tableName: String?, fromFile: String) {
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
                     """
-                     CREATE TABLE $tableName AS SELECT * FROM CSVREAD('$fromFile');
+                     CREATE TABLE $tableName AS SELECT * FROM CSVREAD('$tmp');
                     """
             stmt.executeUpdate(sql)
         }
     }
 }
 
+
+data class UpdatePost(val statements: Array<String>)
+
+// expected queries as a kind of parametr
+fun UpdateServerDatabase() : String {
+    val mapper = jacksonObjectMapper()
+    val queries = arrayOf(
+            "INSERT INTO table2 (id, first, last, age) VALUES (12, 'Kate', 'Pirson', 19);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (13, 'Anna', 'Pirson', 199);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (14, 'Mary', 'Pirson', 20);"
+    )
+
+    val post = UpdatePost(queries)
+    val jsonPost = mapper.writeValueAsString(post)
+    return jsonPost
+}
