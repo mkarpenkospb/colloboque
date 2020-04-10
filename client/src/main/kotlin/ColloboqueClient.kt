@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import java.io.*
 import java.net.*
 import java.io.File
+import java.lang.RuntimeException
 
 
 class ColloboqueClient : CliktCommand() {
@@ -69,16 +70,15 @@ suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
 
 
 
-data class HttpClientException(val response: HttpResponse) : IOException("HTTP Error ${response.status}")
-
 suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
     val fileByteArray = ByteArrayOutputStream()
     val response = request<HttpResponse> {
         url(URL(url))
         method = HttpMethod.Get
     }
+
     if (!response.status.isSuccess()) {
-        throw HttpClientException(response)
+        throw RuntimeException("response status fail")
     }
 
     fileByteArray.writeBytes(response.readBytes())
