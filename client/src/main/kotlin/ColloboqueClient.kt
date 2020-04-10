@@ -49,26 +49,14 @@ fun startClient(ip : String, serverPort : Int, databaseName : String,
                 |user=$user&password=$password&table=$table""".trimMargin()
                         .replace("\n", "")
 
-        client.getAsTempFile(url) { file ->
-            File("/tmp/recieved.csv").writeBytes(file.readBytes())
-        }
-
+        File("/tmp/recieved.csv").writeBytes(client.getAsTempFile(url).toByteArray())
     }
 }
 
 data class HttpClientException(val response: HttpResponse) : IOException("HTTP Error ${response.status}")
 
-suspend fun HttpClient.getAsTempFile(url: String, callback: suspend (file: File) -> Unit) {
-    val file = getAsTempFile(url)
-    try {
-        callback(file)
-    } finally {
-        file.delete()
-    }
-}
-
-suspend fun HttpClient.getAsTempFile(url: String): File {
-    val file = File("/tmp/client_buffer.csv")
+suspend fun HttpClient.getAsTempFile(url: String): ByteArrayOutputStream {
+    val fileByteArray = ByteArrayOutputStream()
     val response = request<HttpResponse> {
         url(URL(url))
         method = HttpMethod.Get
@@ -76,8 +64,9 @@ suspend fun HttpClient.getAsTempFile(url: String): File {
     if (!response.status.isSuccess()) {
         throw HttpClientException(response)
     }
-    response.content.copyAndClose(file.writeChannel())
-    return file
+
+    fileByteArray.writeBytes(response.readBytes())
+    return fileByteArray
 }
 
 fun main(args: Array<String>) = ColloboqueClient().main(args)
