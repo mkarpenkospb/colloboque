@@ -1,5 +1,8 @@
 import com.opencsv.CSVWriter
 import com.zaxxer.hikari.HikariDataSource
+import java.io.BufferedWriter
+import java.io.ByteArrayOutputStream
+import java.io.OutputStreamWriter
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.sql.ResultSetMetaData
@@ -19,14 +22,13 @@ fun connectPostgres(host: String?, port: Int?,
 }
 
 
-fun loadTableFromDB(ds : HikariDataSource, tableName : String? ) {
+fun loadTableFromDB(ds : HikariDataSource, tableName : String? ): ByteArrayOutputStream {
 
     val query =
             """
                 SELECT * FROM $tableName
             """
-
-    val queryCsv = "/tmp/saveClientQuery.csv";
+    val queryByteArray = ByteArrayOutputStream()
 
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
@@ -39,12 +41,11 @@ fun loadTableFromDB(ds : HikariDataSource, tableName : String? ) {
                     colNames[i-1] = rsmd.getColumnName(i)
                 }
 
-                Files.newBufferedWriter(Paths.get(queryCsv)).use { writer ->
-                    CSVWriter(writer,
-                            CSVWriter.DEFAULT_SEPARATOR,
-                            CSVWriter.NO_QUOTE_CHARACTER,
-                            CSVWriter.DEFAULT_ESCAPE_CHARACTER,
-                            CSVWriter.DEFAULT_LINE_END).use { csvWriter ->
+                CSVWriter(BufferedWriter(OutputStreamWriter(queryByteArray)),
+                        CSVWriter.DEFAULT_SEPARATOR,
+                        CSVWriter.NO_QUOTE_CHARACTER,
+                        CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+                        CSVWriter.DEFAULT_LINE_END).use { csvWriter ->
 
                         csvWriter.writeNext(colNames)
                         while (rs.next()) {
@@ -55,8 +56,9 @@ fun loadTableFromDB(ds : HikariDataSource, tableName : String? ) {
                             csvWriter.writeNext(getLine)
                         }
                     }
-                }
             }
         }
     }
+    return queryByteArray
 }
+

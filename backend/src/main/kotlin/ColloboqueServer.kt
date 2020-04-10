@@ -7,22 +7,21 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import java.io.File
 
 
 class ColloboqueServer : CliktCommand() {
     private val portName by option("--server-port", help="Name of the port").int()
-    private val host by option("--pg-host", help="host").default("localhost")
-    private val port by option("--pg-port", help="Number of the port").int().default(5432)
+    private val postgresHost by option("--pg-host", help="host").default("localhost")
+    private val postgresPort by option("--pg-port", help="Number of the port").int().default(5432)
 
     override fun run() {
-        portName?.let { startServer(it, host, port) }
+        portName?.let { startServer(it, postgresHost, postgresPort) }
     }
 
 }
 
 
-fun startServer(portName: Int, host: String, port : Int) {
+fun startServer(portName: Int, postgresHost: String, postgresPort : Int) {
     val server = embeddedServer(Netty, port = portName) {
         routing {
             get("/") {
@@ -35,10 +34,8 @@ fun startServer(portName: Int, host: String, port : Int) {
                 val password = call.parameters["password"]
                 val table = call.parameters["table"]
 
-                val ds = connectPostgres(host, port, database, user, password)
-                loadTableFromDB(ds, table)
-
-                call.respondFile(File("/tmp/saveClientQuery.csv"))
+                val ds = connectPostgres(postgresHost, postgresPort, database, user, password)
+                call.respondBytes(loadTableFromDB(ds, table).toByteArray())
             }
         }
     }
