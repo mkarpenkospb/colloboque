@@ -8,21 +8,15 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
-import java.io.*
 import java.net.*
-import java.io.File
-import java.lang.RuntimeException
-
 
 class ColloboqueClient : CliktCommand() {
 
-    private val user by option("--pg-user", help="User name").default("postgres")
-    private val password by option("--pg-password", help="User password").default("123")
-    private val databaseLocal by option("--h2-database", help="Path to client h2 database")
-    private val tableH2 by option("--table-h2", help="Name of new table in client database")
-    private val tablePsql by option("--table-psql", help="Name of table in server postgres database")
-    private val serverPort by option("--server-port", help="Number of the server port").int().default(8080)
-    private val serverIp by option("--server-ip", help="Server address").default("127.0.0.1")
+    private val databaseLocal by option("--h2-database", help = "Path to client h2 database")
+    private val h2Table by option("--h2-table", help = "Name of new table in client database").default("baseTable")
+    private val pgTable by option("--pg-table", help = "Name of table in server postgres database").default("baseTable")
+    private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
+    private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
     override fun run() {
 
@@ -31,32 +25,29 @@ class ColloboqueClient : CliktCommand() {
         }
 
         /* Probably two different programmes?*/
-        loadTableFromServer(client, serverIp, serverPort, user, password,
-                tablePsql ?: throw IllegalArgumentException("Table name expected"),
-                tableH2 ?: throw IllegalArgumentException("Table name expected"),
-                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
+//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
-
-//        updateTableOnServer(client, serverIp, serverPort, user, password)
+        updateTableOnServer(client, serverHost, serverPort)
     }
 
 }
 
-fun loadTableFromServer(client: HttpClient, ip : String, serverPort : Int, user : String,
-                        password : String, table : String, tableH2: String, databaseLocal: String) {
+fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
+                        table: String, h2Table: String, databaseLocal: String) {
     runBlocking {
-        val url: String = "http://$ip:$serverPort/table?user=$user&password=$password&table=$table"
+        val url: String = "http://$serverHost:$serverPort/table?table=$table"
 
         val localUrl = "jdbc:h2:$databaseLocal"
 
-        importTable(localUrl, tableH2, client.getAsTempFile(url))
+        importTable(localUrl, h2Table, client.getAsTempFile(url))
     }
 }
 
-fun updateTableOnServer(client: HttpClient, ip : String, serverPort : Int, user : String, password : String) {
+fun updateTableOnServer(client: HttpClient, ip: String, serverPort: Int) {
     runBlocking {
-        val url = "http://$ip:$serverPort/update?user=$user&password=$password"
-        val queries = UpdateServerDatabase()
+        val url = "http://$ip:$serverPort/update"
+        val queries = updateRequest()
         sendPostUpdate(url, queries, client)
     }
 }
@@ -69,9 +60,7 @@ suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
 }
 
 
-
 suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
-    val fileByteArray = ByteArrayOutputStream()
     val response = request<HttpResponse> {
         url(URL(url))
         method = HttpMethod.Get
@@ -81,8 +70,7 @@ suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
         throw RuntimeException("response status fail")
     }
 
-    fileByteArray.writeBytes(response.readBytes())
-    return fileByteArray.toByteArray()
+    return response.readBytes()
 }
 
 fun main(args: Array<String>) = ColloboqueClient().main(args)

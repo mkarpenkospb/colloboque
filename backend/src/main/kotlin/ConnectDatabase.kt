@@ -21,14 +21,13 @@ fun connectPostgres(host: String, port: Int,
     return ds
 }
 
-data class UpdatePost(val statements: Array<String>)
+data class UpdatePost(val statements: List<String>)
 
-fun UpdateDataBase(ds: HikariDataSource, jsonQueries: String) {
-    val mapper = jacksonObjectMapper()
-    val update: UpdatePost = mapper.readValue(jsonQueries)
+fun updateDataBase(ds: HikariDataSource, jsonQueries: String) {
 
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
+            val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
             for (q in update.statements) {
                 stmt.execute(q)
             }
@@ -38,22 +37,21 @@ fun UpdateDataBase(ds: HikariDataSource, jsonQueries: String) {
 }
 
 
+fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
 
-fun loadTableFromDB(ds : HikariDataSource, tableName : String ): ByteArrayOutputStream {
-
-   ds.connection.use { conn ->
+    ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
             val query =
-                """
+                    """
                 SELECT * FROM $tableName
                 """
-            stmt.executeQuery(query).use {rs ->
+            stmt.executeQuery(query).use { rs ->
                 val rsmd: ResultSetMetaData = rs.metaData
 
                 val colNames = arrayOfNulls<String>(rsmd.columnCount)
 
                 for (i in 1..rsmd.columnCount) {
-                    colNames[i-1] = rsmd.getColumnName(i)
+                    colNames[i - 1] = rsmd.getColumnName(i)
                 }
                 val queryByteArray = ByteArrayOutputStream()
 
@@ -63,16 +61,16 @@ fun loadTableFromDB(ds : HikariDataSource, tableName : String ): ByteArrayOutput
                         CSVWriter.DEFAULT_ESCAPE_CHARACTER,
                         CSVWriter.DEFAULT_LINE_END).use { csvWriter ->
 
-                        csvWriter.writeNext(colNames)
-                        while (rs.next()) {
-                            val getLine = arrayOfNulls<String>(rsmd.columnCount)
-                            for (i in 1..rsmd.columnCount) {
-                                getLine[i - 1] = rs.getString(i)
-                            }
-                            csvWriter.writeNext(getLine)
+                    csvWriter.writeNext(colNames)
+                    while (rs.next()) {
+                        val getLine = arrayOfNulls<String>(rsmd.columnCount)
+                        for (i in 1..rsmd.columnCount) {
+                            getLine[i - 1] = rs.getString(i)
                         }
-                    return queryByteArray
+                        csvWriter.writeNext(getLine)
                     }
+                    return queryByteArray.toByteArray()
+                }
             }
         }
     }

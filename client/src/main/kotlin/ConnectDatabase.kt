@@ -1,6 +1,5 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import java.io.File
 
 fun importTable(url: String, tableName: String, tableData: ByteArray) {
 
@@ -16,21 +15,22 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
             stmt.executeUpdate(sql)
         }
     }
+
+    tmp.delete()
 }
 
 
-data class UpdatePost(val statements: Array<String>)
+data class UpdatePost(val statements: List<String>)
 
 // expected queries as a kind of parametr
-fun UpdateServerDatabase() : String {
-    val mapper = jacksonObjectMapper()
-    val queries = arrayOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (12, 'Kate', 'Pirson', 19);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (13, 'Anna', 'Pirson', 199);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (14, 'Mary', 'Pirson', 20);"
+fun updateRequest(): String {
+    return jacksonObjectMapper().writeValueAsString(
+            UpdatePost(
+                    listOf(
+                            "INSERT INTO table2 (id, first, last, age) VALUES (15, 'Kate', 'Pirson', 19);",
+                            "INSERT INTO table2 (id, first, last, age) VALUES (16, 'Anna', 'Pirson', 199);",
+                            "INSERT INTO table2 (id, first, last, age) VALUES (17, 'Mary', 'Pirson', 20);"
+                    )
+            )
     )
-
-    val post = UpdatePost(queries)
-    val jsonPost = mapper.writeValueAsString(post)
-    return jsonPost
 }
