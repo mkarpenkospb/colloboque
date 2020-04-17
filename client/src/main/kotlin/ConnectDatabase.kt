@@ -5,7 +5,6 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
 
     val tmp = createTempFile()
     tmp.writeBytes(tableData)
-
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
@@ -17,6 +16,21 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
     }
 
     tmp.delete()
+}
+
+fun applyQueries(url: String, query: List<String>) {
+    DriverManager.getConnection(url).use { conn ->
+        conn.createStatement().use { stmt ->
+            for(sql in query) {
+                try {
+                    stmt.executeUpdate(sql)
+                    clientJournal.addQuery(sql)
+                } catch (e: Throwable) {
+                    clientJournal.addFailQuery(sql, e.cause.toString())
+                }
+            }
+        }
+    }
 }
 
 

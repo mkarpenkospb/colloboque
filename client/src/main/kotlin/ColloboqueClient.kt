@@ -30,21 +30,21 @@ class ColloboqueClient : CliktCommand() {
 
 //        updateTableOnServer(client, serverHost, serverPort)
 
-        actionSimulation(client, serverHost, serverPort)
+        actionSimulation(client, serverHost, serverPort,
+                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
     }
 
 }
 
-fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int) {
+fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int, databaseLocal: String) {
+    val queries = listOf(
+            "INSERT INTO table2 (id, first, last, age) VALUES (15, 'Kate', 'Pirson', 19);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (16, 'Anna', 'Pirson', 199);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (17, 'Mary', 'Pirson', 20);"
+    )
 
-    clientJournal.addQuery(
-            "INSERT INTO table2 (id, first, last, age) VALUES (24, 'Kate', 'Pirson', 19);")
-    clientJournal.addQuery(
-            "INSERT INTO table2 (id, first, last, age) VALUES (25, 'Anna', 'Pirson', 199);")
-    clientJournal.addQuery(
-            "INSERT INTO table2 (id, first, last, age) VALUES (26, 'Mary', 'Pirson', 20);")
-
+    applyQueries("jdbc:h2:$databaseLocal", queries)
 
     clientJournal.updateRequest("http://$serverHost:$serverPort/update", client)
 }
