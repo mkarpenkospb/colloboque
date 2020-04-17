@@ -10,7 +10,7 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
         conn.createStatement().use { stmt ->
             val sql =
                     """
-                     CREATE TABLE $tableName AS SELECT * FROM CSVREAD('$tmp');
+                     CREATE TABLE IF NOT EXISTS $tableName AS SELECT * FROM CSVREAD('$tmp');
                     """
             stmt.executeUpdate(sql)
         }

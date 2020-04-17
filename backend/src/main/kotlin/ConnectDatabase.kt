@@ -11,10 +11,8 @@ import com.fasterxml.jackson.module.kotlin.readValue
 fun connectPostgres(host: String, port: Int,
                     dataBase: String, user: String, password: String): HikariDataSource {
 
-    val url = "jdbc:postgresql://$host:$port/$dataBase"
-
     val ds = HikariDataSource()
-    ds.jdbcUrl = url
+    ds.jdbcUrl = "jdbc:postgresql://$host:$port/$dataBase"
     ds.username = user
     ds.password = password
 
@@ -43,8 +41,8 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
         conn.createStatement().use { stmt ->
             val query =
                     """
-                SELECT * FROM $tableName
-                """
+                    SELECT * FROM $tableName
+                    """
             stmt.executeQuery(query).use { rs ->
                 val rsmd: ResultSetMetaData = rs.metaData
 

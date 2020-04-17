@@ -15,18 +15,20 @@ class ColloboqueServer : CliktCommand() {
     private val portNumber by option("--server-port", help = "Number of the port").int().default(8080)
     private val postgresHost by option("--pg-host", help = "host").default("localhost")
     private val postgresPort by option("--pg-port", help = "Number of the port").int().default(5432)
+    private val user by option("--pg-user", help = "Default user name").default("postgres")
+    private val password by option("--pg-password", help = "Default password").default("")
+    private val table by option("--table", help = "Default table name").default("BaseTable")
+
 
     override fun run() {
-        startServer(portNumber, postgresHost, postgresPort, databaseName)
+        startServer(portNumber, postgresHost, postgresPort, databaseName, user, password, table)
     }
 
 }
 
 
-fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String) {
-
-    val DEFAULT_USER = "tester"
-    val DEFAULT_PASSWORD = "test_password"
+fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String,
+                user: String, password: String, table: String) {
 
     val server = embeddedServer(Netty, port = portNumber) {
         routing {
@@ -38,21 +40,15 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
 
             post("/update") {
 
-                val text = call.receiveText()
-                val ds = connectPostgres(postgresHost, postgresPort, databaseName,
-                        DEFAULT_USER, DEFAULT_PASSWORD)
+                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
+                updateDataBase(ds, call.receiveText())
 
-                updateDataBase(ds, text)
-
-                call.respondText("Done")
+                call.respondText("")
             }
 
             get("/table") {
 
-                val table = call.parameters["table"] ?: "baseTable"
-
-                val ds = connectPostgres(postgresHost, postgresPort, databaseName,
-                        DEFAULT_PASSWORD, DEFAULT_PASSWORD)
+                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 call.respondBytes(loadTableFromDB(ds, table))
             }
         }

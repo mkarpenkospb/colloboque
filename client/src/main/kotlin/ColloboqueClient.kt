@@ -13,8 +13,8 @@ import java.net.*
 class ColloboqueClient : CliktCommand() {
 
     private val databaseLocal by option("--h2-database", help = "Path to client h2 database")
-    private val h2Table by option("--h2-table", help = "Name of new table in client database").default("baseTable")
-    private val pgTable by option("--pg-table", help = "Name of table in server postgres database").default("baseTable")
+    private val h2Table by option("--h2-table", help = "Name of new table in client database").default("BaseTable")
+    private val pgTable by option("--pg-table", help = "Name of table in server postgres database").default("BaseTable")
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
@@ -25,42 +25,44 @@ class ColloboqueClient : CliktCommand() {
         }
 
         /* Probably two different programmes?*/
-//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
+                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
-        updateTableOnServer(client, serverHost, serverPort)
+//        updateTableOnServer(client, serverHost, serverPort)
     }
 
 }
 
 fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
                         table: String, h2Table: String, databaseLocal: String) {
+    
     runBlocking {
-        val url: String = "http://$serverHost:$serverPort/table?table=$table"
-
-        val localUrl = "jdbc:h2:$databaseLocal"
-
-        importTable(localUrl, h2Table, client.getAsTempFile(url))
+        importTable("jdbc:h2:$databaseLocal", h2Table,
+                client.getAsTempFile("http://$serverHost:$serverPort/table?table=$table"))
     }
+
 }
 
 fun updateTableOnServer(client: HttpClient, ip: String, serverPort: Int) {
+
     runBlocking {
-        val url = "http://$ip:$serverPort/update"
-        val queries = updateRequest()
-        sendPostUpdate(url, queries, client)
+        sendPostUpdate("http://$ip:$serverPort/update", updateRequest(), client)
     }
+
 }
 
 
 suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
-    val call = client.post<String>(url) {
+
+    client.post<String>(url) {
         body = queries
     }
+
 }
 
 
 suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
+
     val response = request<HttpResponse> {
         url(URL(url))
         method = HttpMethod.Get
