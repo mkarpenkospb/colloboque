@@ -24,18 +24,35 @@ class ColloboqueClient : CliktCommand() {
             followRedirects = true
         }
 
-        /* Probably two different programmes?*/
-        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+//        /* Probably two different programmes?*/
+//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
+//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
 //        updateTableOnServer(client, serverHost, serverPort)
+
+        actionSimulation(client, serverHost, serverPort)
+
     }
 
 }
 
+fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int) {
+
+    clientJournal.addQuery(
+            "INSERT INTO table2 (id, first, last, age) VALUES (24, 'Kate', 'Pirson', 19);")
+    clientJournal.addQuery(
+            "INSERT INTO table2 (id, first, last, age) VALUES (25, 'Anna', 'Pirson', 199);")
+    clientJournal.addQuery(
+            "INSERT INTO table2 (id, first, last, age) VALUES (26, 'Mary', 'Pirson', 20);")
+
+
+    clientJournal.updateRequest("http://$serverHost:$serverPort/update", client)
+}
+
+
 fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
                         table: String, h2Table: String, databaseLocal: String) {
-    
+
     runBlocking {
         importTable("jdbc:h2:$databaseLocal", h2Table,
                 client.getAsTempFile("http://$serverHost:$serverPort/table?table=$table"))
@@ -43,10 +60,10 @@ fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
 
 }
 
-fun updateTableOnServer(client: HttpClient, ip: String, serverPort: Int) {
+fun updateTableOnServer(client: HttpClient, serverHost: String, serverPort: Int) {
 
     runBlocking {
-        sendPostUpdate("http://$ip:$serverPort/update", updateRequest(), client)
+        sendPostUpdate("http://$serverHost:$serverPort/update", updateRequest(), client)
     }
 
 }
