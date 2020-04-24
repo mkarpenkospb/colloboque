@@ -16,23 +16,24 @@ class Log(private var url: String, createLogTable: String) {
 
     fun writeLog(conn: Connection, queries: List<String>) {
 
-        var logQuery: String
+        val logQuery = """INSERT INTO LOG(sql_command) VALUES ( ? );"""
 
-        conn.createStatement().use { stmt ->
+        conn.prepareStatement(logQuery).use { stmt ->
             for (query in queries) {
-                logQuery = """INSERT INTO LOG(sql_command) VALUES ('${query.replace("'", "''")}');"""
-                stmt.execute(logQuery)
+                stmt.setString(1, query)
+                stmt.execute()
             }
         }
 
     }
 
     fun clear(deleteTo: Int) {
-        val deleteSynchronized = """delete from LOG where id <= $deleteTo;"""
+        val deleteSynchronized = """delete from LOG where id <= ?;"""
 
         DriverManager.getConnection(url).use { conn ->
-            conn.createStatement().use { stmt ->
-                stmt.execute(deleteSynchronized)
+            conn.prepareStatement(deleteSynchronized).use {stmt ->
+                stmt.setInt(1, deleteTo)
+                stmt.execute()
             }
         }
     }
