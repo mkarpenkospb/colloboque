@@ -1,11 +1,13 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.ktor.client.HttpClient
+import io.ktor.client.request.post
+import kotlinx.coroutines.runBlocking
 
 fun importTable(url: String, tableName: String, tableData: ByteArray) {
 
     val tmp = createTempFile()
     tmp.writeBytes(tableData)
-
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
@@ -19,18 +21,28 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
     tmp.delete()
 }
 
+fun applyQueries(url: String, query: List<String>) {
+    DriverManager.getConnection(url).use { conn ->
+        conn.createStatement().use { stmt ->
+            for (sql in query) {
+                stmt.executeUpdate(sql)
+                clientLog.addQuery(sql)
+            }
+        }
+    }
+}
+
 
 data class UpdatePost(val statements: List<String>)
 
-// expected queries as a kind of parametr
-fun updateRequest(): String {
-    return jacksonObjectMapper().writeValueAsString(
-            UpdatePost(
-                    listOf(
-                            "INSERT INTO table2 (id, first, last, age) VALUES (15, 'Kate', 'Pirson', 19);",
-                            "INSERT INTO table2 (id, first, last, age) VALUES (16, 'Anna', 'Pirson', 199);",
-                            "INSERT INTO table2 (id, first, last, age) VALUES (17, 'Mary', 'Pirson', 20);"
-                    )
+
+fun connectServer(url: String, client: HttpClient, queries: MutableList<String>) {
+    runBlocking {
+        client.post<String>(url) {
+            body = jacksonObjectMapper().writeValueAsString(
+                    UpdatePost(queries)
             )
-    )
+        }
+    }
 }
+
