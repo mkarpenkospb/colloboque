@@ -8,50 +8,46 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 
-class Log(private val url: String) {
-    private val currentQueries: MutableList<String> = ArrayList()
-    private var cnt = 0
+class Log(private var url: String, createLogTable: String) {
 
     val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
-                            |ID INT PRIMARY KEY NOT NULL, 
-                            |SQL_COMMAND TEXT NOT NULL,
-                            |TIME TIMESTAMP DEFAULT CURRENT_TIMESTAMP);""".trimMargin()
+                            |id bigint auto_increment, 
+                            |sql_command TEXT NOT NULL);""".trimMargin()
 
-
-    fun addQuery(query: String) {
-        currentQueries.add(query)
-        writeLog(query)
+    init {
+        DriverManager.getConnection(url).use { conn ->
+            conn.createStatement().use { stmt ->
+                stmt.execute(createLogTable)
+            }
+        }
     }
 
-    private fun writeLog(query: String) {
 
-        val currTimestamp = DateTimeFormatter
-                .ofPattern("yyyy-MM-dd HH:mm:ss.SS")
-                .withZone(ZoneOffset.UTC)
-                .format(Instant.now())
+    fun writeLog(query: String) {
 
-        val logQuery = """INSERT INTO LOG VALUES (${cnt}, '${query.replace("'", "''")}', {ts '${currTimestamp}'});"""
+        val logQuery = """INSERT INTO LOG(sql_command) VALUES ('${query.replace("'", "''")}');"""
 
         DriverManager.getConnection(url).use { conn ->
             conn.createStatement().use { stmt ->
                 stmt.execute(createLogTable)
                 stmt.execute(logQuery)
-                cnt++
             }
         }
     }
 
-    fun clear() {
-        currentQueries.clear()
-    }
+    fun clear(deleteTo: Int) {
+        val deleteSynchronized = """delete from LOG where id <= $deleteTo;"""
 
-    fun getQueries(): MutableList<String> {
-        return currentQueries;
+        DriverManager.getConnection(url).use { conn ->
+            conn.createStatement().use { stmt ->
+                stmt.execute(deleteSynchronized)
+            }
+        }
     }
 
 }
 
-val clientLog = Log("jdbc:h2:/home/mkarpenko/bd1")
+
 
 
 

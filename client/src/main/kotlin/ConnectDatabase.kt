@@ -22,12 +22,12 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
     tmp.delete()
 }
 
-fun applyQueries(url: String, query: List<String>) {
+fun applyQueries(url: String, query: List<String>, clientLog: Log) {
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
             for (sql in query) {
                 stmt.executeUpdate(sql)
-                clientLog.addQuery(sql)
+                clientLog.writeLog(sql)
             }
         }
     }
@@ -36,15 +36,31 @@ fun applyQueries(url: String, query: List<String>) {
 
 data class UpdatePost(val statements: List<String>)
 
-// expected queries as a kind of parametr
-fun updateRequest(): String {
-    return jacksonObjectMapper().writeValueAsString(
-            UpdatePost(
-                    listOf(
-                            "INSERT INTO table2 (id, first, last, age) VALUES (15, 'Kate', 'Pirson', 19);",
-                            "INSERT INTO table2 (id, first, last, age) VALUES (16, 'Anna', 'Pirson', 199);",
-                            "INSERT INTO table2 (id, first, last, age) VALUES (17, 'Mary', 'Pirson', 20);"
-                    )
+// expected queries as a kind of parameter
+fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
+
+    val queries : MutableList<String> = ArrayList()
+    var idToDelete = 0
+
+    DriverManager.getConnection(urlLocal).use { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG;").use { res ->
+                while (res.next()) {
+                    idToDelete = res.getString(1).toInt()
+                    queries.add(res.getString(2))
+                }
+            }
+        }
+    }
+
+    runBlocking {
+        client.post<String>(urlServer) {
+            body = jacksonObjectMapper().writeValueAsString(
+                    UpdatePost(queries)
             )
-    )
+        }
+    }
+
+    return idToDelete;
+
 }

@@ -18,34 +18,44 @@ class ColloboqueClient : CliktCommand() {
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
-    override fun run() {
 
+    val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
+                            |id bigint auto_increment, 
+                            |sql_command TEXT NOT NULL);""".trimMargin()
+
+
+    override fun run() {
+        val clientLog = Log("jdbc:h2:$databaseLocal", createLogTable)
         val client = HttpClient(Apache) {
             followRedirects = true
         }
 
         /* Probably two different programmes?*/
-        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
+//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+
+        actionSimulation(client, serverHost, serverPort,
+                databaseLocal ?: throw IllegalArgumentException("Local database name expected"),
+                clientLog)
 
 //        updateTableOnServer(client, serverHost, serverPort)
     }
 
 }
 
-fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int, databaseLocal: String) {
+fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
+                     databaseLocal: String, clientLog: Log) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (36, 'Kate', 'Pirson', 19);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (37, 'Anna', 'Pirson', 199);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (38, 'Mary', 'Pirson', 20);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (72, 'Kate', 'Pirson', 19);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (73, 'Anna', 'Pirson', 199);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (74, 'Mary', 'Pirson', 20);"
     )
 
-    applyQueries("jdbc:h2:$databaseLocal", queries)
+    applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)
 
-    connectServer("http://$serverHost:$serverPort/update", client, clientLog.getQueries())
-
-    clientLog.clear()
+    clientLog.clear(updateServer("http://$serverHost:$serverPort/update",
+            "jdbc:h2:$databaseLocal", client))
 }
 
 
@@ -59,13 +69,6 @@ fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
 
 }
 
-fun updateTableOnServer(client: HttpClient, ip: String, serverPort: Int) {
-
-    runBlocking {
-        sendPostUpdate("http://$ip:$serverPort/update", updateRequest(), client)
-    }
-
-}
 
 
 suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
