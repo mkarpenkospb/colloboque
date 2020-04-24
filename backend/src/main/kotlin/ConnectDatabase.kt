@@ -24,12 +24,15 @@ data class UpdatePost(val statements: List<String>)
 fun updateDataBase(ds: HikariDataSource, jsonQueries: String) {
 
     ds.connection.use { conn ->
+        conn.autoCommit = false
         conn.createStatement().use { stmt ->
             val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
             for (q in update.statements) {
                 stmt.execute(q)
             }
         }
+        conn.commit()
+        conn.autoCommit = true
     }
 
 }

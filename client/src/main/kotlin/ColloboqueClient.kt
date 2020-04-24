@@ -47,9 +47,9 @@ fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
                      databaseLocal: String, clientLog: Log) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (72, 'Kate', 'Pirson', 19);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (73, 'Anna', 'Pirson', 199);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (74, 'Mary', 'Pirson', 20);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (84, 'Kate', 'Pirson', 19);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (85, 'Anna', 'Pirson', 199);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (86, 'Mary', 'Pirson', 20);"
     )
 
     applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)

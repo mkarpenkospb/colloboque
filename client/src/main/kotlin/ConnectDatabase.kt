@@ -23,13 +23,22 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
 }
 
 fun applyQueries(url: String, query: List<String>, clientLog: Log) {
+
+
+    val queries: MutableList<String> = ArrayList()
+
     DriverManager.getConnection(url).use { conn ->
+        conn.autoCommit = false
         conn.createStatement().use { stmt ->
             for (sql in query) {
                 stmt.executeUpdate(sql)
-                clientLog.writeLog(sql)
+                queries.add(sql)
             }
         }
+
+        clientLog.writeLog(conn, queries)
+        conn.commit()
+        conn.autoCommit = true
     }
 }
 

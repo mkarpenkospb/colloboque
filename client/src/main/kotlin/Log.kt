@@ -1,11 +1,6 @@
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import io.ktor.client.HttpClient
-import io.ktor.client.request.post
-import kotlinx.coroutines.*
+import io.ktor.http.escapeIfNeeded
+import java.sql.Connection
 import java.sql.DriverManager
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 
 class Log(private var url: String, createLogTable: String) {
@@ -19,15 +14,17 @@ class Log(private var url: String, createLogTable: String) {
     }
 
 
-    fun writeLog(query: String) {
+    fun writeLog(conn: Connection, queries: List<String>) {
 
-        val logQuery = """INSERT INTO LOG(sql_command) VALUES ('${query.replace("'", "''")}');"""
+        var logQuery: String
 
-        DriverManager.getConnection(url).use { conn ->
-            conn.createStatement().use { stmt ->
+        conn.createStatement().use { stmt ->
+            for (query in queries) {
+                logQuery = """INSERT INTO LOG(sql_command) VALUES ('${query.replace("'", "''")}');"""
                 stmt.execute(logQuery)
             }
         }
+
     }
 
     fun clear(deleteTo: Int) {
