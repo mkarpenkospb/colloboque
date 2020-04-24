@@ -10,10 +10,6 @@ import java.time.format.DateTimeFormatter
 
 class Log(private var url: String, createLogTable: String) {
 
-    val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
-                            |id bigint auto_increment, 
-                            |sql_command TEXT NOT NULL);""".trimMargin()
-
     init {
         DriverManager.getConnection(url).use { conn ->
             conn.createStatement().use { stmt ->
@@ -29,7 +25,6 @@ class Log(private var url: String, createLogTable: String) {
 
         DriverManager.getConnection(url).use { conn ->
             conn.createStatement().use { stmt ->
-                stmt.execute(createLogTable)
                 stmt.execute(logQuery)
             }
         }
