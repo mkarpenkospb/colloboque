@@ -24,15 +24,11 @@ class ColloboqueClient : CliktCommand() {
             followRedirects = true
         }
 
-//        /* Probably two different programmes?*/
-//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
-
-//        updateTableOnServer(client, serverHost, serverPort)
-
-        actionSimulation(client, serverHost, serverPort,
+        /* Probably two different programmes?*/
+        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
                 databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
+//        updateTableOnServer(client, serverHost, serverPort)
     }
 
 }
@@ -55,10 +51,18 @@ fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int, da
 
 fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
                         table: String, h2Table: String, databaseLocal: String) {
-
+    
     runBlocking {
         importTable("jdbc:h2:$databaseLocal", h2Table,
                 client.getAsTempFile("http://$serverHost:$serverPort/table?table=$table"))
+    }
+
+}
+
+fun updateTableOnServer(client: HttpClient, ip: String, serverPort: Int) {
+
+    runBlocking {
+        sendPostUpdate("http://$ip:$serverPort/update", updateRequest(), client)
     }
 
 }
