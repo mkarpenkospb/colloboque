@@ -3,12 +3,11 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
+import com.fasterxml.jackson.module.kotlin.readValue
 
 fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
 
-
     val update: ReplicationPost = jacksonObjectMapper().readValue(tableData)
-
 
     val tmp = createTempFile()
     tmp.writeText(update.csvbase64)
@@ -66,7 +65,6 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }
     }
 
-
     var response : Int? = null
 
     runBlocking {
@@ -77,7 +75,7 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
                                     "Number of synchronization is not initialised"
                             ))
             )
-        }
+        }.toInt()
     }
 
     updateSyncNum(urlLocal, response ?: throw IllegalArgumentException(
