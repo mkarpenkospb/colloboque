@@ -2,12 +2,10 @@ import java.sql.Connection
 import java.sql.DriverManager
 
 
-class Log(private var connectionUrl: String, createLogTable: String) {
+private const val DELETE_SYNCHRONIZED = "delete from LOG where id <= ?;"
+private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
 
-    companion object {
-        private const val DELETE_SYNCHRONIZED = "delete from LOG where id <= ?;"
-        private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
-    }
+class Log(private val connectionUrl: String, createLogTable: String) {
 
     init {
         DriverManager.getConnection(connectionUrl).use { conn ->
