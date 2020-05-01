@@ -1,15 +1,16 @@
-import io.ktor.http.escapeIfNeeded
 import java.sql.Connection
 import java.sql.DriverManager
 
 
-class Log(private var url: String, createLogTable: String) {
+class Log(private var connectionUrl: String, createLogTable: String) {
 
-    val deleteSynchronized = """delete from LOG where id <= ?;"""
-    val logQuery = """INSERT INTO LOG(sql_command) VALUES ( ? );"""
+    companion object {
+        private const val DELETE_SYNCHRONIZED = "delete from LOG where id <= ?;"
+        private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
+    }
 
     init {
-        DriverManager.getConnection(url).use { conn ->
+        DriverManager.getConnection(connectionUrl).use { conn ->
             conn.createStatement().use { stmt ->
                 stmt.execute(createLogTable)
             }
@@ -18,20 +19,18 @@ class Log(private var url: String, createLogTable: String) {
 
 
     fun writeLog(conn: Connection, queries: List<String>) {
-
-        conn.prepareStatement(logQuery).use { stmt ->
+        conn.prepareStatement(LOG_QUERY).use { stmt ->
             for (query in queries) {
                 stmt.setString(1, query)
                 stmt.execute()
             }
         }
-
     }
 
     fun clear(deleteTo: Int) {
 
-        DriverManager.getConnection(url).use { conn ->
-            conn.prepareStatement(deleteSynchronized).use {stmt ->
+        DriverManager.getConnection(connectionUrl).use { conn ->
+            conn.prepareStatement(DELETE_SYNCHRONIZED).use { stmt ->
                 stmt.setInt(1, deleteTo)
                 stmt.execute()
             }

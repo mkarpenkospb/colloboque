@@ -1,13 +1,18 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
 
 fun importTable(url: String, tableName: String, tableData: ByteArray) {
 
+
+    val update: ReplicationPost = jacksonObjectMapper().readValue(tableData)
+
+
     val tmp = createTempFile()
-    tmp.writeBytes(tableData)
+    tmp.writeText(update.csvbase64)
 
     DriverManager.getConnection(url).use { conn ->
         conn.createStatement().use { stmt ->
@@ -19,15 +24,17 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
         }
     }
 
+    updateSyncNum(url, update.sync_num)
+
     tmp.delete()
 }
 
-fun applyQueries(url: String, query: List<String>, clientLog: Log) {
+fun applyQueries(postgresUrl: String, query: List<String>, clientLog: Log) {
 
 
-    val queries: MutableList<String> = ArrayList()
+    val queries = mutableListOf<String>()
 
-    DriverManager.getConnection(url).use { conn ->
+    DriverManager.getConnection(postgresUrl).use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
             for (sql in query) {
@@ -40,15 +47,17 @@ fun applyQueries(url: String, query: List<String>, clientLog: Log) {
         conn.commit()
         conn.autoCommit = true
     }
+
+
 }
 
-
-data class UpdatePost(val statements: List<String>)
+data class ReplicationPost(val csvbase64: String, val sync_num: Int)
+data class UpdatePost(val statements: List<String>, val sync_num: Int)
 
 // expected queries as a kind of parameter
 fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
 
-    val queries : MutableList<String> = ArrayList()
+    val queries = mutableListOf<String>()
     var idToDelete = 0
 
     DriverManager.getConnection(urlLocal).use { conn ->
@@ -62,14 +71,53 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }
     }
 
+
+    var response : Int? = null
+
     runBlocking {
-        client.post<String>(urlServer) {
+        response = client.post<String>(urlServer) {
             body = jacksonObjectMapper().writeValueAsString(
-                    UpdatePost(queries)
+                    UpdatePost(queries,
+                            getSyncNum(urlLocal) ?: throw IllegalArgumentException(
+                                    "Number of synchronization is not initialised"
+                            ))
             )
+        }.toInt()
+    }
+
+    updateSyncNum(urlLocal, response ?: throw IllegalArgumentException(
+            "Number of synchronization is not initialised"
+    ))
+
+    return idToDelete;
+
+}
+
+
+fun updateSyncNum(url: String, syncNum: Int) {
+
+    DriverManager.getConnection(url).use { conn ->
+        conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
+            stmt.setInt(1, syncNum)
+            stmt.execute()
         }
     }
 
-    return idToDelete;
+}
+
+fun getSyncNum(url: String) : Int? {
+
+    var syncNum: Int? = null
+
+    DriverManager.getConnection(url).use { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
+                res.next()
+                syncNum = res.getInt(1)
+            }
+        }
+    }
+
+    return syncNum
 
 }

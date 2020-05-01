@@ -31,14 +31,13 @@ class ColloboqueClient : CliktCommand() {
         }
 
         /* Probably two different programmes?*/
-//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
+        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
+                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
 
-        actionSimulation(client, serverHost, serverPort,
-                databaseLocal ?: throw IllegalArgumentException("Local database name expected"),
-                clientLog)
+//        actionSimulation(client, serverHost, serverPort,
+//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"),
+//                clientLog)
 
-//        updateTableOnServer(client, serverHost, serverPort)
     }
 
 }
@@ -47,9 +46,9 @@ fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
                      databaseLocal: String, clientLog: Log) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (87, 'Kate', 'Pirson', 19);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (88, 'Anna', 'Pirson', 199);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (89, 'Mary', 'Pirson', 20);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (103, 'Kate', 'Pirson', 19);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (104, 'Anna', 'Pirson', 199);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (105, 'Mary', 'Pirson', 20);"
     )
 
     applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)
@@ -65,16 +64,6 @@ fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
     runBlocking {
         importTable("jdbc:h2:$databaseLocal", h2Table,
                 client.getAsTempFile("http://$serverHost:$serverPort/table?table=$table"))
-    }
-
-}
-
-
-
-suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
-
-    client.post<String>(url) {
-        body = queries
     }
 
 }
