@@ -18,10 +18,9 @@ class ColloboqueClient : CliktCommand() {
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
-
-    val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
-                            |id bigint auto_increment, 
-                            |sql_command TEXT NOT NULL);""".trimMargin()
+    private val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
+                                        |id bigint auto_increment, 
+                                        |sql_command TEXT NOT NULL);""".trimMargin()
 
 
     override fun run() {
@@ -71,19 +70,19 @@ fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
 
 
 
-suspend fun sendPostUpdate(url: String, queries: String, client: HttpClient) {
+suspend fun sendPostUpdate(connectionUrl: String, queries: String, client: HttpClient) {
 
-    client.post<String>(url) {
+    client.post<String>(connectionUrl) {
         body = queries
     }
 
 }
 
 
-suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
+suspend fun HttpClient.getAsTempFile(connectionUrl: String): ByteArray {
 
     val response = request<HttpResponse> {
-        url(URL(url))
+        url(URL(connectionUrl))
         method = HttpMethod.Get
     }
 

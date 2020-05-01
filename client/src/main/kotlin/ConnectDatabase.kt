@@ -4,12 +4,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
 
-fun importTable(url: String, tableName: String, tableData: ByteArray) {
+fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
 
     val tmp = createTempFile()
     tmp.writeBytes(tableData)
 
-    DriverManager.getConnection(url).use { conn ->
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
                     """
@@ -22,12 +22,11 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
     tmp.delete()
 }
 
-fun applyQueries(url: String, query: List<String>, clientLog: Log) {
+fun applyQueries(connectionUrl: String, query: List<String>, clientLog: Log) {
 
+    val queries = mutableListOf<String>()
 
-    val queries: MutableList<String> = ArrayList()
-
-    DriverManager.getConnection(url).use { conn ->
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
             for (sql in query) {
@@ -48,12 +47,12 @@ data class UpdatePost(val statements: List<String>)
 // expected queries as a kind of parameter
 fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
 
-    val queries : MutableList<String> = ArrayList()
+    val queries = mutableListOf<String>()
     var idToDelete = 0
 
     DriverManager.getConnection(urlLocal).use { conn ->
         conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG;").use { res ->
+            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG ORDER BY ID;").use { res ->
                 while (res.next()) {
                     idToDelete = res.getString(1).toInt()
                     queries.add(res.getString(2))
