@@ -55,21 +55,15 @@ fun updateSyncNum(ds: HikariDataSource, syncNum: Int) {
 
 }
 
-fun getSyncNum(ds: HikariDataSource) : Int? {
-
-    var syncNum: Int? = null
-
+fun getSyncNum(ds: HikariDataSource) : Int {
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
             stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
                 res.next()
-                syncNum = res.getInt(1)
+                return res.getInt(1)
             }
         }
     }
-
-    return syncNum
-
 }
 
 
@@ -109,10 +103,7 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                     }
                 }
                 return jacksonObjectMapper().writeValueAsBytes(ReplicationPost(
-                        Base64.encodeBase64String(queryByteArray.toByteArray()),
-                        getSyncNum(ds) ?: throw IllegalArgumentException(
-                                "Number of synchronization is not initialised"
-                        )))
+                        Base64.encodeBase64String(queryByteArray.toByteArray()), getSyncNum(ds)))
             }
         }
     }

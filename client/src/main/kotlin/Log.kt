@@ -1,4 +1,3 @@
-import io.ktor.http.escapeIfNeeded
 import java.sql.Connection
 import java.sql.DriverManager
 
@@ -24,7 +23,6 @@ class Log(private val connectionUrl: String, createLogTable: String) {
                 stmt.execute()
             }
         }
-
     }
 
     fun clear(deleteTo: Int) {

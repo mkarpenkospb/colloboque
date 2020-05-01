@@ -65,15 +65,12 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }
     }
 
-    var response : Int? = null
+    var response: Int? = null
 
     runBlocking {
         response = client.post<String>(urlServer) {
             body = jacksonObjectMapper().writeValueAsString(
-                    UpdatePost(queries,
-                            getSyncNum(urlLocal) ?: throw IllegalArgumentException(
-                                    "Number of synchronization is not initialised"
-                            ))
+                    UpdatePost(queries, getSyncNum(urlLocal))
             )
         }.toInt()
     }
@@ -83,34 +80,25 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
     ))
 
     return idToDelete;
-
 }
 
 
-fun updateSyncNum(url: String, syncNum: Int) {
-
-    DriverManager.getConnection(url).use { conn ->
+fun updateSyncNum(connectionUrl: String, syncNum: Int) {
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
             stmt.setInt(1, syncNum)
             stmt.execute()
         }
     }
-
 }
 
-fun getSyncNum(url: String) : Int? {
-
-    var syncNum: Int? = null
-
-    DriverManager.getConnection(url).use { conn ->
+fun getSyncNum(connectionUrl: String): Int {
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.createStatement().use { stmt ->
             stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
                 res.next()
-                syncNum = res.getInt(1)
+                return res.getInt(1)
             }
         }
     }
-
-    return syncNum
-
 }
