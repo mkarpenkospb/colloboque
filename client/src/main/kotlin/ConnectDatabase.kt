@@ -56,7 +56,7 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
 
     DriverManager.getConnection(urlLocal).use { conn ->
         conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG ORDER BY ID;").use { res ->
+            stmt.executeQuery("SELECT id, sql_command FROM LOG ORDER BY id;").use { res ->
                 while (res.next()) {
                     idToDelete = res.getString(1).toInt()
                     queries.add(res.getString(2))
