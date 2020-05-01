@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
@@ -41,9 +42,9 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             post("/update") {
 
                 val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
-                updateDataBase(ds, call.receiveText())
+                val syncNum = updateDataBase(ds, call.receiveText())
 
-                call.respondText("")
+                call.respondText(syncNum.toString())
             }
 
             get("/table") {

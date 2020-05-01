@@ -6,6 +6,7 @@ import java.io.OutputStreamWriter
 import java.sql.ResultSetMetaData
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import org.apache.commons.codec.binary.Base64
 
 
 fun connectPostgres(host: String, port: Int,
@@ -19,14 +20,14 @@ fun connectPostgres(host: String, port: Int,
     return ds
 }
 
-data class UpdatePost(val statements: List<String>)
+data class UpdatePost(val statements: List<String>, val sync_num: Int)
 
-fun updateDataBase(ds: HikariDataSource, jsonQueries: String) {
+fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
 
+    val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
     ds.connection.use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
-            val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
             for (q in update.statements) {
                 stmt.execute(q)
             }
@@ -35,8 +36,44 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String) {
         conn.autoCommit = true
     }
 
+    // increase sync number, one update
+
+    updateSyncNum(ds, update.sync_num + 1)
+
+    return update.sync_num + 1;
 }
 
+
+fun updateSyncNum(ds: HikariDataSource, syncNum: Int) {
+
+    ds.connection.use { conn ->
+        conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
+            stmt.setInt(1, syncNum)
+            stmt.execute()
+        }
+    }
+
+}
+
+fun getSyncNum(ds: HikariDataSource) : Int? {
+
+    var syncNum: Int? = null
+
+    ds.connection.use { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
+                res.next()
+                syncNum = res.getInt(1)
+            }
+        }
+    }
+
+    return syncNum
+
+}
+
+
+data class ReplicationPost(val csvbase64: String, val sync_num: Int)
 
 fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
 
@@ -70,8 +107,12 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                         }
                         csvWriter.writeNext(getLine)
                     }
-                    return queryByteArray.toByteArray()
                 }
+                return jacksonObjectMapper().writeValueAsBytes(ReplicationPost(
+                        Base64.encodeBase64String(queryByteArray.toByteArray()),
+                        getSyncNum(ds) ?: throw IllegalArgumentException(
+                                "Number of synchronization is not initialised"
+                        )))
             }
         }
     }

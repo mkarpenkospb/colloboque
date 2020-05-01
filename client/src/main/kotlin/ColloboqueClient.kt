@@ -18,10 +18,9 @@ class ColloboqueClient : CliktCommand() {
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
-
-    val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
-                            |id bigint auto_increment, 
-                            |sql_command TEXT NOT NULL);""".trimMargin()
+    private val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
+                                        |id bigint auto_increment, 
+                                        |sql_command TEXT NOT NULL);""".trimMargin()
 
 
     override fun run() {

@@ -1,3 +1,4 @@
+import io.ktor.http.escapeIfNeeded
 import java.sql.Connection
 import java.sql.DriverManager
 
@@ -25,10 +26,10 @@ class Log(private var connectionUrl: String, createLogTable: String) {
                 stmt.execute()
             }
         }
+
     }
 
     fun clear(deleteTo: Int) {
-
         DriverManager.getConnection(connectionUrl).use { conn ->
             conn.prepareStatement(DELETE_SYNCHRONIZED).use { stmt ->
                 stmt.setInt(1, deleteTo)

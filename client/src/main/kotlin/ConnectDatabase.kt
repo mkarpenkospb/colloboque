@@ -1,11 +1,10 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
 
-fun importTable(url: String, tableName: String, tableData: ByteArray) {
+fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
 
 
     val update: ReplicationPost = jacksonObjectMapper().readValue(tableData)
@@ -14,7 +13,7 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
     val tmp = createTempFile()
     tmp.writeText(update.csvbase64)
 
-    DriverManager.getConnection(url).use { conn ->
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.createStatement().use { stmt ->
             val sql =
                     """
@@ -24,17 +23,15 @@ fun importTable(url: String, tableName: String, tableData: ByteArray) {
         }
     }
 
-    updateSyncNum(url, update.sync_num)
+    updateSyncNum(connectionUrl, update.sync_num)
 
     tmp.delete()
 }
 
-fun applyQueries(postgresUrl: String, query: List<String>, clientLog: Log) {
-
+fun applyQueries(connectionUrl: String, query: List<String>, clientLog: Log) {
 
     val queries = mutableListOf<String>()
-
-    DriverManager.getConnection(postgresUrl).use { conn ->
+    DriverManager.getConnection(connectionUrl).use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
             for (sql in query) {
@@ -47,8 +44,6 @@ fun applyQueries(postgresUrl: String, query: List<String>, clientLog: Log) {
         conn.commit()
         conn.autoCommit = true
     }
-
-
 }
 
 data class ReplicationPost(val csvbase64: String, val sync_num: Int)
@@ -62,7 +57,7 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
 
     DriverManager.getConnection(urlLocal).use { conn ->
         conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG;").use { res ->
+            stmt.executeQuery("SELECT ID, SQL_COMMAND FROM LOG ORDER BY ID;").use { res ->
                 while (res.next()) {
                     idToDelete = res.getString(1).toInt()
                     queries.add(res.getString(2))
@@ -82,7 +77,7 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
                                     "Number of synchronization is not initialised"
                             ))
             )
-        }.toInt()
+        }
     }
 
     updateSyncNum(urlLocal, response ?: throw IllegalArgumentException(
