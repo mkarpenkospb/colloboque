@@ -4,15 +4,23 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import kotlinx.coroutines.runBlocking
 import com.fasterxml.jackson.module.kotlin.readValue
+import org.apache.commons.codec.binary.Base64
+import java.sql.Connection
+
+
+data class ReplicationPost(val csvbase64: ByteArray, val sync_num: Int)
+data class UpdatePost(val statements: List<String>, val sync_num: Int)
+
 
 fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
 
     val update: ReplicationPost = jacksonObjectMapper().readValue(tableData)
 
     val tmp = createTempFile()
-    tmp.writeText(update.csvbase64)
+    tmp.writeText(String(Base64.decodeBase64(update.csvbase64)))
 
     DriverManager.getConnection(connectionUrl).use { conn ->
+        conn.autoCommit = false
         conn.createStatement().use { stmt ->
             val sql =
                     """
@@ -20,9 +28,10 @@ fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) 
                     """
             stmt.executeUpdate(sql)
         }
+        updateSyncNum(conn, update.sync_num)
+        conn.commit()
+        conn.autoCommit = true
     }
-
-    updateSyncNum(connectionUrl, update.sync_num)
 
     tmp.delete()
 }
@@ -38,15 +47,12 @@ fun applyQueries(connectionUrl: String, query: List<String>, clientLog: Log) {
                 queries.add(sql)
             }
         }
-
         clientLog.writeLog(conn, queries)
         conn.commit()
         conn.autoCommit = true
     }
 }
 
-data class ReplicationPost(val csvbase64: String, val sync_num: Int)
-data class UpdatePost(val statements: List<String>, val sync_num: Int)
 
 // expected queries as a kind of parameter
 fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
@@ -75,7 +81,7 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }.toInt()
     }
 
-    updateSyncNum(urlLocal, response ?: throw IllegalArgumentException(
+    updateSyncNum(DriverManager.getConnection(urlLocal), response ?: throw IllegalArgumentException(
             "Number of synchronization is not initialised"
     ))
 
@@ -83,12 +89,10 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
 }
 
 
-fun updateSyncNum(connectionUrl: String, syncNum: Int) {
-    DriverManager.getConnection(connectionUrl).use { conn ->
-        conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
-            stmt.setInt(1, syncNum)
-            stmt.execute()
-        }
+fun updateSyncNum(conn: Connection, syncNum: Int) {
+    conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
+        stmt.setInt(1, syncNum)
+        stmt.execute()
     }
 }
 

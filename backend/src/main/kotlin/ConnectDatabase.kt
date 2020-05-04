@@ -7,6 +7,11 @@ import java.sql.ResultSetMetaData
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.apache.commons.codec.binary.Base64
+import java.sql.Connection
+
+
+data class UpdatePost(val statements: List<String>, val sync_num: Int)
+data class ReplicationPost(val csvbase64: ByteArray, val sync_num: Int)
 
 
 fun connectPostgres(host: String, port: Int,
@@ -20,10 +25,8 @@ fun connectPostgres(host: String, port: Int,
     return ds
 }
 
-data class UpdatePost(val statements: List<String>, val sync_num: Int)
 
 fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
-
     val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
     ds.connection.use { conn ->
         conn.autoCommit = false
@@ -32,28 +35,22 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
                 stmt.execute(q)
             }
         }
+        updateSyncNum(conn, update.sync_num + 1)
         conn.commit()
         conn.autoCommit = true
     }
-
-    // increase sync number, one update
-
-    updateSyncNum(ds, update.sync_num + 1)
 
     return update.sync_num + 1;
 }
 
 
-fun updateSyncNum(ds: HikariDataSource, syncNum: Int) {
-
-    ds.connection.use { conn ->
-        conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
-            stmt.setInt(1, syncNum)
-            stmt.execute()
-        }
+fun updateSyncNum(conn: Connection, syncNum: Int) {
+    conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
+        stmt.setInt(1, syncNum)
+        stmt.execute()
     }
-
 }
+
 
 fun getSyncNum(ds: HikariDataSource) : Int {
     ds.connection.use { conn ->
@@ -67,10 +64,7 @@ fun getSyncNum(ds: HikariDataSource) : Int {
 }
 
 
-data class ReplicationPost(val csvbase64: String, val sync_num: Int)
-
 fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
-
     ds.connection.use { conn ->
         conn.createStatement().use { stmt ->
             val query =
@@ -103,7 +97,7 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                     }
                 }
                 return jacksonObjectMapper().writeValueAsBytes(ReplicationPost(
-                        Base64.encodeBase64String(queryByteArray.toByteArray()), getSyncNum(ds)))
+                        Base64.encodeBase64(queryByteArray.toByteArray()), getSyncNum(ds)))
             }
         }
     }

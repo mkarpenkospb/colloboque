@@ -10,6 +10,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.*
 import java.net.*
 
+
 class ColloboqueClient : CliktCommand() {
 
     private val databaseLocal by option("--h2-database", help = "Path to client h2 database")
@@ -45,9 +46,9 @@ fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
                      databaseLocal: String, clientLog: Log) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (106, 'Kate', 'Pirson', 19);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (107, 'Anna', 'Pirson', 199);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (108, 'Mary', 'Pirson', 20);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (106, 'Kate', 'Pirson', 110);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (107, 'Anna', 'Pirson', 111);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (108, 'Mary', 'Pirson', 112);"
     )
 
     applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)
@@ -68,10 +69,10 @@ fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
 }
 
 
-suspend fun HttpClient.getAsTempFile(url: String): ByteArray {
+suspend fun HttpClient.getAsTempFile(connectionUrl: String): ByteArray {
 
     val response = request<HttpResponse> {
-        url(URL(url))
+        url(URL(connectionUrl))
         method = HttpMethod.Get
     }
 
