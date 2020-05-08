@@ -7,7 +7,6 @@ import io.ktor.client.engine.apache.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.cio.expectMultipart
 import kotlinx.coroutines.*
 import java.net.*
 import java.sql.DriverManager
@@ -27,6 +26,7 @@ class ColloboqueClient : CliktCommand() {
     private val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
                                         |id bigint auto_increment, 
                                         |sql_command TEXT NOT NULL);""".trimMargin()
+
 
     private val createUserIdTable = """CREATE TABLE USER_ID(
                             |id INT PRIMARY KEY NOT NULL,      
@@ -74,9 +74,9 @@ fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
                      databaseLocal: String, clientLog: Log) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (109, 'Kate', 'Pirson', 116);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (110, 'Anna', 'Pirson', 117);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (111, 'Mary', 'Pirson', 118);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (114, 'Kate', 'Pirson', 116);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (115, 'Anna', 'Pirson', 117);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (116, 'Mary', 'Pirson', 118);"
     )
 
     applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)
