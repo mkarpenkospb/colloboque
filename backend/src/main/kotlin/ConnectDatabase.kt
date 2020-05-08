@@ -52,13 +52,11 @@ fun updateSyncNum(conn: Connection, syncNum: Int) {
 }
 
 
-fun getSyncNum(ds: HikariDataSource) : Int {
-    ds.connection.use { conn ->
-        conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
-                res.next()
-                return res.getInt(1)
-            }
+fun getSyncNum(conn: Connection) : Int {
+    conn.createStatement().use { stmt ->
+        stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
+            res.next()
+            return res.getInt(1)
         }
     }
 }
@@ -97,7 +95,7 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                         csvWriter.writeNext(getLine)
                     }
                 }
-                val syncNum = getSyncNum(ds)
+                val syncNum = getSyncNum(conn)
                 conn.commit()
                 conn.autoCommit = true
                 return jacksonObjectMapper().writeValueAsBytes(ReplicationResponse(
