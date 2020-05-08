@@ -8,13 +8,13 @@ import org.apache.commons.codec.binary.Base64
 import java.sql.Connection
 
 
-data class ReplicationPost(val csvbase64: ByteArray, val sync_num: Int)
-data class UpdatePost(val statements: List<String>, val sync_num: Int)
+data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
+data class UpdateRequest(val statements: List<String>, val sync_num: Int)
 
 
 fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
 
-    val update: ReplicationPost = jacksonObjectMapper().readValue(tableData)
+    val update: ReplicationResponse = jacksonObjectMapper().readValue(tableData)
 
     val tmp = createTempFile()
     tmp.writeText(String(Base64.decodeBase64(update.csvbase64)))
@@ -24,7 +24,7 @@ fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) 
         conn.createStatement().use { stmt ->
             val sql =
                     """
-                     CREATE TABLE IF NOT EXISTS $tableName AS SELECT * FROM CSVREAD('$tmp');
+                     CREATE TABLE IF NOT EXISTS $tableName AS SELECT * FROM CSVREAD('${tmp.absolutePath}');
                     """
             stmt.executeUpdate(sql)
         }
@@ -71,19 +71,15 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }
     }
 
-    var response: Int? = null
-
-    runBlocking {
-        response = client.post<String>(urlServer) {
+    val response = runBlocking {
+        client.post<String>(urlServer) {
             body = jacksonObjectMapper().writeValueAsString(
-                    UpdatePost(queries, getSyncNum(urlLocal))
+                    UpdateRequest(queries, getSyncNum(urlLocal))
             )
         }.toInt()
     }
 
-    updateSyncNum(DriverManager.getConnection(urlLocal), response ?: throw IllegalArgumentException(
-            "Number of synchronization is not initialised"
-    ))
+    updateSyncNum(DriverManager.getConnection(urlLocal), response)
 
     return idToDelete;
 }

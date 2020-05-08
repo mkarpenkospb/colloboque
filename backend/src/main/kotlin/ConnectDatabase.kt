@@ -10,8 +10,8 @@ import org.apache.commons.codec.binary.Base64
 import java.sql.Connection
 
 
-data class UpdatePost(val statements: List<String>, val sync_num: Int)
-data class ReplicationPost(val csvbase64: ByteArray, val sync_num: Int)
+data class UpdateResponse(val statements: List<String>, val sync_num: Int)
+data class ReplicationRequest(val csvbase64: ByteArray, val sync_num: Int)
 
 
 fun connectPostgres(host: String, port: Int,
@@ -27,7 +27,7 @@ fun connectPostgres(host: String, port: Int,
 
 
 fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
-    val update: UpdatePost = jacksonObjectMapper().readValue(jsonQueries)
+    val update: UpdateResponse = jacksonObjectMapper().readValue(jsonQueries)
     ds.connection.use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
@@ -66,6 +66,7 @@ fun getSyncNum(ds: HikariDataSource) : Int {
 
 fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
     ds.connection.use { conn ->
+        conn.autoCommit = false
         conn.createStatement().use { stmt ->
             val query =
                     """
@@ -96,8 +97,11 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                         csvWriter.writeNext(getLine)
                     }
                 }
-                return jacksonObjectMapper().writeValueAsBytes(ReplicationPost(
-                        Base64.encodeBase64(queryByteArray.toByteArray()), getSyncNum(ds)))
+                val syncNum = getSyncNum(ds)
+                conn.commit()
+                conn.autoCommit = true
+                return jacksonObjectMapper().writeValueAsBytes(ReplicationRequest(
+                        Base64.encodeBase64(queryByteArray.toByteArray()), syncNum))
             }
         }
     }
