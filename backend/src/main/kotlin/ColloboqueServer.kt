@@ -43,6 +43,9 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
                 val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 val syncNum = updateDataBase(ds, call.receiveText())
 
+                if (syncNum == -1)
+                    throw RuntimeException()
+
                 call.respondText(syncNum.toString())
             }
 

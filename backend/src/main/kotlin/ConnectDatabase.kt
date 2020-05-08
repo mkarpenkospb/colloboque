@@ -30,17 +30,28 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
     val update: UpdateRequest = jacksonObjectMapper().readValue(jsonQueries)
     ds.connection.use { conn ->
         conn.autoCommit = false
-        conn.createStatement().use { stmt ->
-            for (q in update.statements) {
-                stmt.execute(q)
-            }
+        val serverSyncNum = getSyncNum(conn)
+        if (serverSyncNum == update.sync_num) {
+            runUpdateRequest(conn, update)
+            conn.commit()
+            conn.autoCommit = true
+            return update.sync_num + 1
+        } else if (serverSyncNum > update.sync_num) {
+            // --------------- doing smth ---------------
+        } else {
+            // --------------- doing smth else ----------
         }
-        updateSyncNum(conn, update.sync_num + 1)
-        conn.commit()
-        conn.autoCommit = true
     }
+    return -1
+}
 
-    return update.sync_num + 1;
+fun runUpdateRequest(conn: Connection, update: UpdateRequest) {
+    conn.createStatement().use { stmt ->
+        for (q in update.statements) {
+            stmt.execute(q)
+        }
+    }
+    updateSyncNum(conn, update.sync_num + 1)
 }
 
 
