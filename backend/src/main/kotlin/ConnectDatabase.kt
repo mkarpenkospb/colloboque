@@ -37,9 +37,9 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
             conn.autoCommit = true
             return update.sync_num + 1
         } else if (serverSyncNum > update.sync_num) {
-            // --------------- doing smth ---------------
+            fun TODO(): Nothing = throw NotImplementedError()
         } else {
-            // --------------- doing smth else ----------
+            fun TODO(): Nothing = throw NotImplementedError()
         }
     }
     return -1
