@@ -35,10 +35,10 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
 
             get("/") {
                 call.respondText("Hello!")
-
             }
 
             post("/update") {
+                val userId = call.parameters["user"]
 
                 val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 val syncNum = updateDataBase(ds, call.receiveText())
@@ -50,6 +50,7 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             get("/table") {
+                val userId = call.parameters["user"]
 
                 val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 call.respondBytes(loadTableFromDB(ds, table))

@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.apache.commons.codec.binary.Base64
 import java.sql.Connection
+import java.sql.DatabaseMetaData
 
 
 data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
@@ -98,6 +99,25 @@ fun getSyncNum(connectionUrl: String): Int {
             stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
                 res.next()
                 return res.getInt(1)
+            }
+        }
+    }
+}
+
+fun existsTable(conn: Connection, tableName: String): Boolean {
+    val rs = conn.getMetaData().getTables(null, null, tableName, null)
+    while (rs.next()) {
+        return true
+    }
+    return false
+}
+
+fun getUserId(connectionUrl: String): String {
+    DriverManager.getConnection(connectionUrl).use { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery("SELECT uuid FROM USER_ID WHERE id=0;").use { res ->
+                res.next()
+                return res.getString(1)
             }
         }
     }
