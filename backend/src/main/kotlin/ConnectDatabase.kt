@@ -10,8 +10,8 @@ import org.apache.commons.codec.binary.Base64
 import java.sql.Connection
 
 
-data class UpdateResponse(val statements: List<String>, val sync_num: Int)
-data class ReplicationRequest(val csvbase64: ByteArray, val sync_num: Int)
+data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
+data class UpdateRequest(val statements: List<String>, val sync_num: Int)
 
 
 fun connectPostgres(host: String, port: Int,
@@ -27,7 +27,7 @@ fun connectPostgres(host: String, port: Int,
 
 
 fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
-    val update: UpdateResponse = jacksonObjectMapper().readValue(jsonQueries)
+    val update: UpdateRequest = jacksonObjectMapper().readValue(jsonQueries)
     ds.connection.use { conn ->
         conn.autoCommit = false
         conn.createStatement().use { stmt ->
@@ -100,7 +100,7 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
                 val syncNum = getSyncNum(ds)
                 conn.commit()
                 conn.autoCommit = true
-                return jacksonObjectMapper().writeValueAsBytes(ReplicationRequest(
+                return jacksonObjectMapper().writeValueAsBytes(ReplicationResponse(
                         Base64.encodeBase64(queryByteArray.toByteArray()), syncNum))
             }
         }
