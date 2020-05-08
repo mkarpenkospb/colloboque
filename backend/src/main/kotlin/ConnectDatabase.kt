@@ -37,12 +37,20 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
             conn.autoCommit = true
             return update.sync_num + 1
         } else if (serverSyncNum > update.sync_num) {
-            fun TODO(): Nothing = throw NotImplementedError()
+            actionInCaseServerIsAhead()
         } else {
-            fun TODO(): Nothing = throw NotImplementedError()
+            actionInCaseClientIsAhead()
         }
     }
     return -1
+}
+
+fun actionInCaseServerIsAhead(): Int {
+    TODO("Implement branch")
+}
+
+fun actionInCaseClientIsAhead(): Int {
+    TODO("Implement this branch too")
 }
 
 fun runUpdateRequest(conn: Connection, update: UpdateRequest) {
