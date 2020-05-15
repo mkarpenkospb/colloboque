@@ -31,9 +31,9 @@ class ColloboqueClient : CliktCommand() {
 fun actionSimulation(client: Client, serverHost: String, serverPort: Int) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (190, 'Kate', 'Pirson', 116);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (191, 'Anna', 'Pirson', 117);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (192, 'Mary', 'Pirson', 118);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (193, 'Kate', 'Pirson', 116);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (194, 'Anna', 'Pirson', 117);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (195, 'Mary', 'Pirson', 118);"
     )
 
     client.applyQueries(queries)

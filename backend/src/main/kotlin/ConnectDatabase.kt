@@ -26,23 +26,25 @@ fun connectPostgres(host: String, port: Int,
 }
 
 
-fun updateDataBase(ds: HikariDataSource, jsonQueries: String): Int {
+fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): Int {
     val update: UpdateRequest = jacksonObjectMapper().readValue(jsonQueries)
+    var updatedSyncNum = -1
     ds.connection.use { conn ->
         conn.autoCommit = false
         val serverSyncNum = getSyncNum(conn)
         if (serverSyncNum == update.sync_num) {
             runUpdateRequest(conn, update)
+            serverLog.writeLog(conn, update)
             conn.commit()
             conn.autoCommit = true
-            return update.sync_num + 1
+            updatedSyncNum = update.sync_num + 1
         } else if (serverSyncNum > update.sync_num) {
             actionInCaseServerIsAhead()
         } else {
             actionInCaseClientIsAhead()
         }
     }
-    return -1
+    return updatedSyncNum
 }
 
 fun actionInCaseServerIsAhead(): Int {

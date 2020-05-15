@@ -4,13 +4,16 @@ import java.sql.DriverManager
 
 private const val DELETE_SYNCHRONIZED = "delete from LOG where id <= ?;"
 private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
+private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS LOG( 
+                                        id bigint auto_increment,
+                                        sql_command TEXT NOT NULL);"""
 
-class Log(private val connectionUrl: String, createLogTable: String) {
+class Log(private val connectionUrl: String) {
 
     init {
         DriverManager.getConnection(connectionUrl).use { conn ->
             conn.createStatement().use { stmt ->
-                stmt.execute(createLogTable)
+                stmt.execute(CREATE_LOG_TABLE)
             }
         }
     }

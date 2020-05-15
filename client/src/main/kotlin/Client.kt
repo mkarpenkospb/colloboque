@@ -12,10 +12,6 @@ private const val CREATE_USER_ID_TABLE = """CREATE TABLE USER_ID(
 private const val INSERT_UID = """INSERT INTO USER_ID(id, uuid) VALUES (0, ?)"""
 
 
-private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS LOG( 
-                                        id bigint auto_increment,
-                                        sql_command TEXT NOT NULL);"""
-
 private const val CREATE_SYNCHRONISATION_TABLE = """CREATE TABLE IF NOT EXISTS SYNCHRONISATION(
                                                     id INT PRIMARY KEY NOT NULL,      
                                                     sync_num INT NOT NULL);"""
@@ -43,7 +39,7 @@ class Client (val connectionUrl: String) {
 
         userId = getUserId(connectionUrl)
         // --------------------------- create client log -------------------------
-        log = Log(connectionUrl, CREATE_LOG_TABLE)
+        log = Log(connectionUrl)
 
         // --------------------------- create http client -------------------------
         httpClient = HttpClient(Apache) {

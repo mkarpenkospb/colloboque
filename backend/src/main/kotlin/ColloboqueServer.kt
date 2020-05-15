@@ -30,6 +30,9 @@ class ColloboqueServer : CliktCommand() {
 fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String,
                 user: String, password: String, table: String) {
 
+    val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
+    val serverLog = Log(ds)
+
     val server = embeddedServer(Netty, port = portNumber) {
         routing {
 
@@ -38,10 +41,8 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             post("/update") {
-                val userId = call.parameters["user"]
 
-                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
-                val syncNum = updateDataBase(ds, call.receiveText())
+                val syncNum = updateDataBase(ds, call.receiveText(), serverLog)
 
                 if (syncNum == -1) {
                     throw RuntimeException("Server update operation failed")
@@ -51,9 +52,7 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             get("/table") {
-                val userId = call.parameters["user"]
 
-                val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
                 call.respondBytes(loadTableFromDB(ds, table))
             }
         }
