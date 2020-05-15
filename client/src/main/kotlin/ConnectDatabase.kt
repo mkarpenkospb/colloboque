@@ -1,27 +1,26 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.ktor.client.HttpClient
-import io.ktor.client.request.post
+//import io.ktor.client.request.post
+//import io.ktor.client.request.forms
 import kotlinx.coroutines.runBlocking
 import com.fasterxml.jackson.module.kotlin.readValue
+import io.ktor.client.request.post
 import org.apache.commons.codec.binary.Base64
 import java.sql.Connection
-import java.sql.DatabaseMetaData
 
 
 data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
 data class UpdateRequest(val statements: List<String>, val sync_num: Int)
 
 
-fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) {
+fun importTable(client: Client, tableName: String, tableData: ByteArray) {
 
     val update: ReplicationResponse = jacksonObjectMapper().readValue(tableData)
 
     val tmp = createTempFile()
     tmp.writeText(String(Base64.decodeBase64(update.csvbase64)))
-
-    DriverManager.getConnection(connectionUrl).use { conn ->
-        conn.autoCommit = false
+    transaction(client) { conn ->
         conn.createStatement().use { stmt ->
             val sql =
                     """
@@ -30,38 +29,33 @@ fun importTable(connectionUrl: String, tableName: String, tableData: ByteArray) 
             stmt.executeUpdate(sql)
         }
         updateSyncNum(conn, update.sync_num)
-        conn.commit()
-        conn.autoCommit = true
     }
 
     tmp.delete()
 }
 
-fun applyQueries(connectionUrl: String, query: List<String>, clientLog: Log) {
+fun applyQueries(client: Client, query: List<String>) {
 
     val queries = mutableListOf<String>()
-    DriverManager.getConnection(connectionUrl).use { conn ->
-        conn.autoCommit = false
+    transaction(client) { conn ->
         conn.createStatement().use { stmt ->
             for (sql in query) {
                 stmt.executeUpdate(sql)
                 queries.add(sql)
             }
         }
-        clientLog.writeLog(conn, queries)
-        conn.commit()
-        conn.autoCommit = true
+        client.LOG.writeLog(conn, queries)
     }
 }
 
 
 // expected queries as a kind of parameter
-fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
+fun updateServer(urlServer: String, client: Client): Int {
 
     val queries = mutableListOf<String>()
     var idToDelete = 0
 
-    DriverManager.getConnection(urlLocal).use { conn ->
+    DriverManager.getConnection(client.CONNECTION_URL).use { conn ->
         conn.createStatement().use { stmt ->
             stmt.executeQuery("SELECT id, sql_command FROM LOG ORDER BY id;").use { res ->
                 while (res.next()) {
@@ -72,15 +66,28 @@ fun updateServer(urlServer: String, urlLocal: String, client: HttpClient): Int {
         }
     }
 
+    // it doesn't work, maybe server doesn't recognise it as POST, but submitForm POST by default
+//    val response = runBlocking {
+//        client.HTTP_CLIENT.submitForm<HttpResponse>(
+//                url = urlServer,
+//                formParameters = Parameters.build {
+//                    append("user", client.USER_ID)
+//                    append("queries", jacksonObjectMapper().writeValueAsString(
+//                    UpdateRequest(queries, getSyncNum(client.CONNECTION_URL))))
+//                },
+//                encodeInQuery = true
+//        )
+//    }.toString().toInt()
+
     val response = runBlocking {
-        client.post<String>(urlServer) {
+        client.HTTP_CLIENT.post<String>(urlServer) {
             body = jacksonObjectMapper().writeValueAsString(
-                    UpdateRequest(queries, getSyncNum(urlLocal))
+                    UpdateRequest(queries, getSyncNum(client.CONNECTION_URL))
             )
         }.toInt()
     }
 
-    updateSyncNum(DriverManager.getConnection(urlLocal), response)
+    updateSyncNum(DriverManager.getConnection(client.CONNECTION_URL), response)
 
     return idToDelete;
 }
@@ -112,13 +119,12 @@ fun existsTable(conn: Connection, tableName: String): Boolean {
     return false
 }
 
-fun getUserId(connectionUrl: String): String {
-    DriverManager.getConnection(connectionUrl).use { conn ->
-        conn.createStatement().use { stmt ->
-            stmt.executeQuery("SELECT uuid FROM USER_ID WHERE id=0;").use { res ->
-                res.next()
-                return res.getString(1)
-            }
+fun <T> transaction(client: Client, code: (Connection) -> T): T {
+    return DriverManager.getConnection(client.CONNECTION_URL).use { conn ->
+        conn.autoCommit = false
+        code(conn).also {
+            conn.commit()
+            conn.autoCommit = true
         }
     }
 }

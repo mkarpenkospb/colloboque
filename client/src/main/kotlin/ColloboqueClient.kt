@@ -3,16 +3,11 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import io.ktor.client.*
-import io.ktor.client.engine.apache.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import java.net.*
-import java.sql.DriverManager
-import java.util.*
-
-var USER_ID : String? = null
 
 class ColloboqueClient : CliktCommand() {
 
@@ -22,77 +17,37 @@ class ColloboqueClient : CliktCommand() {
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
-    // ----------------- SQL queries constants ---------------------------
-    private val createLogTable = """CREATE TABLE IF NOT EXISTS LOG(
-                                        |id bigint auto_increment, 
-                                        |sql_command TEXT NOT NULL);""".trimMargin()
-
-
-    private val createUserIdTable = """CREATE TABLE USER_ID(
-                            |id INT PRIMARY KEY NOT NULL,      
-                            |uuid TEXT NOT NULL);
-                            """.trimMargin()
-
-    private val insertUID = """INSERT INTO USER_ID(id, uuid) VALUES (0, '%s')"""
 
     override fun run() {
-        // ------------------ create user id if not exists -------------------
-        DriverManager.getConnection("jdbc:h2:$databaseLocal").use { conn ->
-            conn.autoCommit = false
-            if (!existsTable(conn, "USER_ID")) {
-                val userId = UUID.randomUUID().toString()
-                conn.createStatement().use { stmt ->
-                    stmt.execute(createUserIdTable)
-                    stmt.execute(insertUID.format(userId))
-                }
-            }
-            conn.commit()
-            conn.autoCommit = true
-        }
+        val sessionClient = Client("jdbc:h2:$databaseLocal")
 
-        USER_ID = getUserId("jdbc:h2:$databaseLocal")
-        // -----------------------------------------------------------------
+        loadTableFromServer(sessionClient, serverHost, serverPort, pgTable)
 
-        val clientLog = Log("jdbc:h2:$databaseLocal", createLogTable)
-        val client = HttpClient(Apache) {
-            followRedirects = true
-        }
-
-        /* Probably two different programmes?*/
-//        loadTableFromServer(client, serverHost, serverPort, pgTable, h2Table,
-//                databaseLocal ?: throw IllegalArgumentException("Local database name expected"))
-
-        actionSimulation(client, serverHost, serverPort,
-                databaseLocal ?: throw IllegalArgumentException("Local database name expected"),
-                clientLog)
-
+//        actionSimulation(sessionClient, serverHost, serverPort)
     }
 
 }
 
-fun actionSimulation(client: HttpClient, serverHost: String, serverPort: Int,
-                     databaseLocal: String, clientLog: Log) {
+fun actionSimulation(client: Client, serverHost: String, serverPort: Int) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (114, 'Kate', 'Pirson', 116);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (115, 'Anna', 'Pirson', 117);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (116, 'Mary', 'Pirson', 118);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (138, 'Kate', 'Pirson', 116);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (139, 'Anna', 'Pirson', 117);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (140, 'Mary', 'Pirson', 118);"
     )
 
-    applyQueries("jdbc:h2:$databaseLocal", queries, clientLog)
+    applyQueries(client, queries)
 
-    clientLog.clear(updateServer("http://$serverHost:$serverPort/update?user=$USER_ID",
-            "jdbc:h2:$databaseLocal", client))
+    client.LOG.clear(updateServer("http://$serverHost:$serverPort/update?user=${client.USER_ID}", client))
 }
 
 
-fun loadTableFromServer(client: HttpClient, serverHost: String, serverPort: Int,
-                        table: String, h2Table: String, databaseLocal: String) {
+fun loadTableFromServer(client: Client, serverHost: String, serverPort: Int, h2Table: String) {
     
     runBlocking {
-        importTable("jdbc:h2:$databaseLocal", h2Table,
-                client.getAsTempFile(
-                        "http://$serverHost:$serverPort/table?user=$USER_ID"
+        importTable(client, h2Table,
+                client.HTTP_CLIENT.getAsTempFile(
+                        "http://$serverHost:$serverPort/table?user=${client.USER_ID}"
                 )
         )
     }
