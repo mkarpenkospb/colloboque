@@ -21,9 +21,9 @@ class ColloboqueClient : CliktCommand() {
     override fun run() {
         val sessionClient = Client("jdbc:h2:$databaseLocal")
 
-        loadTableFromServer(sessionClient, serverHost, serverPort, pgTable)
+//        loadTableFromServer(sessionClient, serverHost, serverPort, pgTable)
 
-//        actionSimulation(sessionClient, serverHost, serverPort)
+        actionSimulation(sessionClient, serverHost, serverPort)
     }
 
 }
@@ -31,14 +31,14 @@ class ColloboqueClient : CliktCommand() {
 fun actionSimulation(client: Client, serverHost: String, serverPort: Int) {
 
     val queries = listOf(
-            "INSERT INTO table2 (id, first, last, age) VALUES (138, 'Kate', 'Pirson', 116);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (139, 'Anna', 'Pirson', 117);",
-            "INSERT INTO table2 (id, first, last, age) VALUES (140, 'Mary', 'Pirson', 118);"
+            "INSERT INTO table2 (id, first, last, age) VALUES (190, 'Kate', 'Pirson', 116);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (191, 'Anna', 'Pirson', 117);",
+            "INSERT INTO table2 (id, first, last, age) VALUES (192, 'Mary', 'Pirson', 118);"
     )
 
-    applyQueries(client, queries)
+    client.applyQueries(queries)
 
-    client.LOG.clear(updateServer("http://$serverHost:$serverPort/update?user=${client.USER_ID}", client))
+    client.log.clear(updateServer("http://$serverHost:$serverPort/update", client))
 }
 
 
@@ -46,8 +46,8 @@ fun loadTableFromServer(client: Client, serverHost: String, serverPort: Int, h2T
     
     runBlocking {
         importTable(client, h2Table,
-                client.HTTP_CLIENT.getAsTempFile(
-                        "http://$serverHost:$serverPort/table?user=${client.USER_ID}"
+                client.httpClient.getAsTempFile(
+                        "http://$serverHost:$serverPort/table?user=${client.userId}"
                 )
         )
     }

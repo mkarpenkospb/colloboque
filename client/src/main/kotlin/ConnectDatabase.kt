@@ -1,6 +1,5 @@
 import java.sql.DriverManager
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import io.ktor.client.HttpClient
 //import io.ktor.client.request.post
 //import io.ktor.client.request.forms
 import kotlinx.coroutines.runBlocking
@@ -11,7 +10,7 @@ import java.sql.Connection
 
 
 data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
-data class UpdateRequest(val statements: List<String>, val sync_num: Int)
+data class UpdateRequest(val statements: List<String>, val sync_num: Int, val user_id: String)
 
 
 fun importTable(client: Client, tableName: String, tableData: ByteArray) {
@@ -20,7 +19,7 @@ fun importTable(client: Client, tableName: String, tableData: ByteArray) {
 
     val tmp = createTempFile()
     tmp.writeText(String(Base64.decodeBase64(update.csvbase64)))
-    transaction(client) { conn ->
+    client.txnManager.transaction { conn ->
         conn.createStatement().use { stmt ->
             val sql =
                     """
@@ -34,20 +33,6 @@ fun importTable(client: Client, tableName: String, tableData: ByteArray) {
     tmp.delete()
 }
 
-fun applyQueries(client: Client, query: List<String>) {
-
-    val queries = mutableListOf<String>()
-    transaction(client) { conn ->
-        conn.createStatement().use { stmt ->
-            for (sql in query) {
-                stmt.executeUpdate(sql)
-                queries.add(sql)
-            }
-        }
-        client.LOG.writeLog(conn, queries)
-    }
-}
-
 
 // expected queries as a kind of parameter
 fun updateServer(urlServer: String, client: Client): Int {
@@ -55,7 +40,7 @@ fun updateServer(urlServer: String, client: Client): Int {
     val queries = mutableListOf<String>()
     var idToDelete = 0
 
-    DriverManager.getConnection(client.CONNECTION_URL).use { conn ->
+    DriverManager.getConnection(client.connectionUrl).use { conn ->
         conn.createStatement().use { stmt ->
             stmt.executeQuery("SELECT id, sql_command FROM LOG ORDER BY id;").use { res ->
                 while (res.next()) {
@@ -80,14 +65,14 @@ fun updateServer(urlServer: String, client: Client): Int {
 //    }.toString().toInt()
 
     val response = runBlocking {
-        client.HTTP_CLIENT.post<String>(urlServer) {
+        client.httpClient.post<String>(urlServer) {
             body = jacksonObjectMapper().writeValueAsString(
-                    UpdateRequest(queries, getSyncNum(client.CONNECTION_URL))
+                    UpdateRequest(queries, getSyncNum(client.connectionUrl), client.userId)
             )
         }.toInt()
     }
 
-    updateSyncNum(DriverManager.getConnection(client.CONNECTION_URL), response)
+    updateSyncNum(DriverManager.getConnection(client.connectionUrl), response)
 
     return idToDelete;
 }
@@ -112,19 +97,23 @@ fun getSyncNum(connectionUrl: String): Int {
 }
 
 fun existsTable(conn: Connection, tableName: String): Boolean {
-    val rs = conn.getMetaData().getTables(null, null, tableName, null)
+    val rs = conn.metaData.getTables(null, null, tableName, null)
     while (rs.next()) {
         return true
     }
     return false
 }
 
-fun <T> transaction(client: Client, code: (Connection) -> T): T {
-    return DriverManager.getConnection(client.CONNECTION_URL).use { conn ->
-        conn.autoCommit = false
-        code(conn).also {
-            conn.commit()
-            conn.autoCommit = true
+class TransactionManager(val connectionUrl: String) {
+    fun <T> transaction(code: (Connection) -> T): T {
+        return DriverManager.getConnection(connectionUrl).use { conn ->
+            conn.autoCommit = false
+            code(conn).also {
+                conn.commit()
+                conn.autoCommit = true
+            }
         }
     }
 }
+
+

@@ -22,14 +22,14 @@ private const val CREATE_SYNCHRONISATION_TABLE = """CREATE TABLE IF NOT EXISTS S
 
 private const val INIT_SYNCHRONISATION_TABLE = """INSERT INTO SYNCHRONISATION VALUES (0, 0);"""
 
-class Client (val CONNECTION_URL: String) {
-    val USER_ID: String
-    val LOG: Log
-    val HTTP_CLIENT: HttpClient
-
+class Client (val connectionUrl: String) {
+    val userId: String
+    val log: Log
+    val httpClient: HttpClient
+    val txnManager = TransactionManager(connectionUrl)
     init {
         // ------------------ create user id if not exists -------------------
-        transaction(this) { conn ->
+        txnManager.transaction { conn ->
             if (!existsTable(conn, "USER_ID")) {
                 conn.createStatement().use { stmt ->
                     stmt.execute(CREATE_USER_ID_TABLE)
@@ -41,17 +41,17 @@ class Client (val CONNECTION_URL: String) {
             }
         }
 
-        USER_ID = getUserId(CONNECTION_URL)
+        userId = getUserId(connectionUrl)
         // --------------------------- create client log -------------------------
-        LOG = Log(CONNECTION_URL, CREATE_LOG_TABLE)
+        log = Log(connectionUrl, CREATE_LOG_TABLE)
 
         // --------------------------- create http client -------------------------
-        HTTP_CLIENT = HttpClient(Apache) {
+        httpClient = HttpClient(Apache) {
             followRedirects = true
         }
 
         // -------------------------- create sync table if not exists -------------
-        transaction (this) { conn ->
+        txnManager.transaction { conn ->
             if (!existsTable(conn, "SYNCHRONISATION")) {
                 conn.createStatement().use { stmt ->
                     stmt.execute(CREATE_SYNCHRONISATION_TABLE)
@@ -71,4 +71,18 @@ class Client (val CONNECTION_URL: String) {
             }
         }
     }
+
+    fun applyQueries(query: List<String>) {
+        val queries = mutableListOf<String>()
+        txnManager.transaction  { conn ->
+            conn.createStatement().use { stmt ->
+                for (sql in query) {
+                    stmt.executeUpdate(sql)
+                    queries.add(sql)
+                }
+            }
+            log.writeLog(conn, queries)
+        }
+    }
+
 }
