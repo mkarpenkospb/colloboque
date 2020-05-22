@@ -1,24 +1,30 @@
-import com.opencsv.CSVWriter
-import com.zaxxer.hikari.HikariDataSource
-import java.io.BufferedWriter
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
-import java.sql.ResultSetMetaData
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.opencsv.CSVWriter
+import com.zaxxer.hikari.HikariDataSource
 import org.apache.commons.codec.binary.Base64
+import org.postgresql.copy.CopyManager
+import org.postgresql.core.BaseConnection
+import java.io.*
 import java.sql.Connection
+import java.sql.ResultSetMetaData
 
+
+private const val CALL_FUNCTION = "{call clone_schema(?, ?, true)}"
+private const val BASE_SCHEMA_NAME = "schema"
 
 data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
 data class UpdateRequest(val statements: List<String>, val sync_num: Int, val user_id: String)
+data class MergeRequest(val statements: List<String>, val csvbase64: ByteArray,
+                        val sync_num: Int, val user_id: String)
 
 
-fun connectPostgres(host: String, port: Int,
-                    dataBase: String, user: String, password: String): HikariDataSource {
+
+fun connectPostgres(host: String, port: Int, dataBase: String, currentSchema: String,
+                    user: String, password: String): HikariDataSource {
 
     val ds = HikariDataSource()
-    ds.jdbcUrl = "jdbc:postgresql://$host:$port/$dataBase"
+    ds.jdbcUrl = "jdbc:postgresql://$host:$port/$dataBase?currentSchema=$currentSchema"
     ds.username = user
     ds.password = password
 
@@ -39,20 +45,87 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): I
             conn.autoCommit = true
             updatedSyncNum = update.sync_num + 1
         } else if (serverSyncNum > update.sync_num) {
-            actionInCaseServerIsAhead()
+            return -2
         } else {
-            actionInCaseClientIsAhead()
+            TODO("Implement this branch too")
         }
     }
     return updatedSyncNum
 }
 
-fun actionInCaseServerIsAhead(): Int {
-    TODO("Implement branch")
-}
 
-fun actionInCaseClientIsAhead(): Int {
-    TODO("Implement this branch too")
+// current temporary table name
+fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
+                  postgresPort: Int, databaseName: String,
+                  currentSchema: String, user: String, password: String,
+                  oldClientTable: ByteArray, tableName: String = "TABLE2") : HikariDataSource {
+
+    val mergeData: MergeRequest = jacksonObjectMapper().readValue(oldClientTable)
+    val queries = mergeData.statements.toMutableList()
+    val currentSchemaVersion = currentSchema.substring(BASE_SCHEMA_NAME.length).toInt()
+    val newSchema = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
+
+    // create and call function
+    ds.connection.use { conn ->
+        conn.createStatement().use {stmt->
+            stmt.execute(CLONE_SCHEMA)
+        }
+        conn.prepareCall(CALL_FUNCTION).use { cstmt ->
+            cstmt.setString(1, currentSchema)
+            cstmt.setString(2, newSchema)
+            cstmt.execute()
+        }
+    }
+
+    // the same as in client part
+    val tmp = createTempFile()
+    tmp.writeText(String(Base64.decodeBase64(mergeData.csvbase64)))
+    transaction(ds){conn ->
+        conn.createStatement().use{stmt->
+            stmt.execute("DROP TABLE IF EXISTS ${newSchema}.${tableName}")
+            stmt.execute("""CREATE TABLE IF NOT EXISTS ${newSchema}.${tableName} (
+                            id INT PRIMARY KEY NOT NULL,
+                            first TEXT NOT NULL,
+                            last TEXT NOT NULL,
+                            age INT NOT NULL);
+                            """)
+        }
+        CopyManager(conn.unwrap(BaseConnection::class.java))
+                .copyIn(
+                        "COPY ${newSchema}.${tableName} FROM STDIN (FORMAT csv, HEADER)",
+                        BufferedReader(FileReader(tmp.absolutePath))
+                )
+    }
+    tmp.delete()
+
+    val dsNew = connectPostgres(postgresHost, postgresPort, databaseName, newSchema, user, password)
+    // Select all the newest from log
+    transaction(dsNew) {conn->
+        conn.createStatement().use { stmt->
+            stmt.executeQuery(
+                    """SELECT sql_command FROM LOG 
+                       WHERE sync_num > ${mergeData.sync_num}
+                       ORDER BY sync_num, q_id""").use {res ->
+                while (res.next()) {
+                    queries.add(res.getString(1))
+                }
+            }
+        }
+    }
+
+    try {
+        transaction(dsNew) { conn ->
+            conn.createStatement().use {stmt ->
+                for (sql in queries) {
+                    stmt.execute(sql)
+                }
+                updateSyncNum(conn, getSyncNum(conn) + 1)
+            }
+        }
+        return dsNew
+    } catch (e : Throwable) {
+        TODO("action in case merging failed")
+    }
 }
 
 fun runUpdateRequest(conn: Connection, update: UpdateRequest) {
@@ -78,6 +151,17 @@ fun getSyncNum(conn: Connection) : Int {
         stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
             res.next()
             return res.getInt(1)
+        }
+    }
+}
+
+
+fun <T> transaction(ds: HikariDataSource, code: (Connection) -> T): T {
+    return ds.connection.use { conn ->
+        conn.autoCommit = false
+        code(conn).also {
+            conn.commit()
+            conn.autoCommit = true
         }
     }
 }

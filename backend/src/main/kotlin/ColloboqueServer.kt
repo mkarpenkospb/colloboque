@@ -8,6 +8,7 @@ import io.ktor.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.request.*
+import io.ktor.util.toByteArray
 
 
 class ColloboqueServer : CliktCommand() {
@@ -18,19 +19,19 @@ class ColloboqueServer : CliktCommand() {
     private val user by option("--pg-user", help = "Default user name").default("postgres")
     private val password by option("--pg-password", help = "Default password").default("")
     private val table by option("--table", help = "Default table name").default("BaseTable")
-
+    private val currentSchema by option("--pg-schema", help = "Current schema").default("public")
 
     override fun run() {
-        startServer(portNumber, postgresHost, postgresPort, databaseName, user, password, table)
+        startServer(portNumber, postgresHost, postgresPort, databaseName, currentSchema, user, password, table)
     }
 
 }
 
 
 fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String,
-                user: String, password: String, table: String) {
+                currentSchema: String, user: String, password: String, table: String) {
 
-    val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
+    var ds = connectPostgres(postgresHost, postgresPort, databaseName, currentSchema, user, password)
     val serverLog = Log(ds)
 
     val server = embeddedServer(Netty, port = portNumber) {
@@ -48,11 +49,17 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
                     throw RuntimeException("Server update operation failed")
                 }
 
+                //  in case syncNum == -2 client has an action
                 call.respondText(syncNum.toString())
             }
 
-            get("/table") {
+            post("/merge") {
+                ds = mergeDataBase(ds, portNumber, postgresHost, postgresPort, databaseName,
+                        currentSchema, user, password, call.receiveChannel().toByteArray())
+                call.respondText(getSyncNum(ds.connection).toString())
+            }
 
+            get("/table") {
                 call.respondBytes(loadTableFromDB(ds, table))
             }
         }

@@ -18,6 +18,11 @@ private const val CREATE_SYNCHRONISATION_TABLE = """CREATE TABLE IF NOT EXISTS S
 
 private const val INIT_SYNCHRONISATION_TABLE = """INSERT INTO SYNCHRONISATION VALUES (0, 0);"""
 
+private const val DROP_TABLE = """DROP TABLE IF EXISTS %s """;
+
+private const val CLONE_TABLE = """CREATE TABLE %s AS SELECT * FROM %s """;
+
+
 class Client (val connectionUrl: String) {
     val userId: String
     val log: Log
@@ -81,4 +86,13 @@ class Client (val connectionUrl: String) {
         }
     }
 
+    fun cloneTable(tableName: String) {
+        val cloneName = "${tableName}_CLONE"
+        txnManager.transaction {conn ->
+            conn.createStatement().use { stmt -> // I can't use prepared stmt for table names
+                stmt.execute(DROP_TABLE.format(cloneName))
+                stmt.execute(CLONE_TABLE.format(cloneName, tableName))
+            }
+        }
+    }
 }

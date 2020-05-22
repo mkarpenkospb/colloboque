@@ -23,7 +23,7 @@ class Log(ds: HikariDataSource) {
     fun writeLog(conn: Connection, update: UpdateRequest) {
         conn.prepareStatement(LOG_QUERY).use { stmt ->
             for ((counter, query) in update.statements.withIndex()) { // as I watched queries way, the order here should be correct
-                stmt.setInt(1, update.sync_num + 1)
+                stmt.setInt(1, update.sync_num)
                 stmt.setInt(2, counter)
                 stmt.setString(3, query)
                 stmt.setString(4, update.user_id)
