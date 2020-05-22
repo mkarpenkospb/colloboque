@@ -6,7 +6,7 @@ import java.util.*
 // ----------------- SQL queries constants ---------------------------
 
 private const val CREATE_USER_ID_TABLE = """CREATE TABLE USER_ID(
-                                        id INT PRIMARY KEY NOT NULL,      
+                                         id INT PRIMARY KEY NOT NULL,      
                                          uuid TEXT NOT NULL);"""
 
 private const val INSERT_UID = """INSERT INTO USER_ID(id, uuid) VALUES (0, ?)"""

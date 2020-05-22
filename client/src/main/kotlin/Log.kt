@@ -3,10 +3,10 @@ import java.sql.DriverManager
 
 
 private const val DELETE_SYNCHRONIZED = "delete from LOG where id <= ?;"
-private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
 private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS LOG( 
                                         id bigint auto_increment,
                                         sql_command TEXT NOT NULL);"""
+private const val LOG_QUERY = "INSERT INTO LOG(sql_command) VALUES ( ? );"
 
 class Log(private val connectionUrl: String) {
 
