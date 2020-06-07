@@ -10,7 +10,7 @@ val CLONE_SCHEMA = """
     dest_schema text,
     include_recs boolean)
   RETURNS void AS
-${'$'}${body}${'$'}
+${'$'}$body${'$'}
 
 --  This function will clone all sequences, tables, data, views & functions from any existing schema to a new one
 -- SAMPLE CALL:
@@ -186,7 +186,7 @@ BEGIN
 
 END;
 
-${'$'}${body}${'$'}
+${'$'}$body${'$'}
   LANGUAGE plpgsql VOLATILE
   COST 100;
 """

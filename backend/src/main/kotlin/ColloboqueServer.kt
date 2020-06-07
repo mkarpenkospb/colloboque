@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
@@ -9,6 +10,7 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.request.*
 import io.ktor.util.toByteArray
+import org.apache.commons.codec.binary.Base64
 
 
 class ColloboqueServer : CliktCommand() {
@@ -18,7 +20,7 @@ class ColloboqueServer : CliktCommand() {
     private val postgresPort by option("--pg-port", help = "Number of the port").int().default(5432)
     private val user by option("--pg-user", help = "Default user name").default("postgres")
     private val password by option("--pg-password", help = "Default password").default("")
-    private val table by option("--table", help = "Default table name").default("BaseTable")
+    private val table by option("--table", help = "Default table name").default("MAIN_TABLE")
     private val currentSchema by option("--pg-schema", help = "Current schema").default("public")
 
     override fun run() {
@@ -28,12 +30,12 @@ class ColloboqueServer : CliktCommand() {
 }
 
 
+
 fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String,
                 currentSchema: String, user: String, password: String, table: String) {
-
     var ds = connectPostgres(postgresHost, postgresPort, databaseName, currentSchema, user, password)
-    val serverLog = Log(ds)
-
+    val serverLog = ServerLog(ds)
+    setUpServer(ds)
     val server = embeddedServer(Netty, port = portNumber) {
         routing {
 
@@ -42,7 +44,6 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             post("/update") {
-
                 val syncNum = updateDataBase(ds, call.receiveText(), serverLog)
 
                 if (syncNum == -1) {
@@ -54,13 +55,19 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             post("/merge") {
+
                 ds = mergeDataBase(ds, portNumber, postgresHost, postgresPort, databaseName,
                         currentSchema, user, password, call.receiveChannel().toByteArray())
+
                 call.respondText(getSyncNum(ds.connection).toString())
             }
 
             get("/table") {
-                call.respondBytes(loadTableFromDB(ds, table))
+                // bad for SyncNum and table date, SyncNum might change
+                call.respondBytes(jacksonObjectMapper().writeValueAsBytes(ReplicationResponse(
+                        Base64.encodeBase64(loadTableFromDB(ds.connection,  table)),
+                        getSyncNum(ds.connection)
+                )))
             }
         }
     }

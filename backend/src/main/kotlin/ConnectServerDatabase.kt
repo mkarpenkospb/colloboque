@@ -9,16 +9,23 @@ import java.io.*
 import java.sql.Connection
 import java.sql.ResultSetMetaData
 
+// setting queries
+private const val CREATE_MAIN_TABLE = """CREATE TABLE IF NOT EXISTS MAIN_TABLE(
+                                      id INT PRIMARY KEY NOT NULL, 
+                                      first TEXT NOT NULL,
+                                      last TEXT NOT NULL,
+                                      age INT NOT NULL);"""
+
+private const val CREATE_SYNCHRONISATION_TABLE = """CREATE TABLE IF NOT EXISTS SYNCHRONISATION(
+                                                    id INT PRIMARY KEY NOT NULL,      
+                                                    sync_num INT NOT NULL);"""
+
+
+private const val INIT_SYNCHRONISATION_TABLE = """INSERT INTO SYNCHRONISATION VALUES (0, 0);"""
+
 
 private const val CALL_FUNCTION = "{call clone_schema(?, ?, true)}"
 private const val BASE_SCHEMA_NAME = "schema"
-
-data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
-data class UpdateRequest(val statements: List<String>, val sync_num: Int, val user_id: String)
-data class MergeRequest(val statements: List<String>, val csvbase64: ByteArray,
-                        val sync_num: Int, val user_id: String)
-
-
 
 fun connectPostgres(host: String, port: Int, dataBase: String, currentSchema: String,
                     user: String, password: String): HikariDataSource {
@@ -27,12 +34,30 @@ fun connectPostgres(host: String, port: Int, dataBase: String, currentSchema: St
     ds.jdbcUrl = "jdbc:postgresql://$host:$port/$dataBase?currentSchema=$currentSchema"
     ds.username = user
     ds.password = password
-
+    ds.schema = currentSchema
     return ds
 }
 
+fun setUpServer(ds: HikariDataSource) {
+    // -------------- create main table if not exists ----------------
+    transaction(ds) { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.execute(CREATE_MAIN_TABLE)
+        }
+    }
 
-fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): Int {
+    // -------------------------- create sync table if not exists -------------
+    transaction(ds) { conn ->
+        if (!existsTable(conn, "synchronisation", ds.schema)) {
+            conn.createStatement().use { stmt ->
+                stmt.execute(CREATE_SYNCHRONISATION_TABLE)
+                stmt.execute(INIT_SYNCHRONISATION_TABLE)
+            }
+        }
+    }
+}
+
+fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: ServerLog): Int {
     val update: UpdateRequest = jacksonObjectMapper().readValue(jsonQueries)
     var updatedSyncNum = -1
     ds.connection.use { conn ->
@@ -63,7 +88,7 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
     val mergeData: MergeRequest = jacksonObjectMapper().readValue(oldClientTable)
     val queries = mergeData.statements.toMutableList()
     val currentSchemaVersion = currentSchema.substring(BASE_SCHEMA_NAME.length).toInt()
-    val newSchema = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
+    val newSchema = "$BASE_SCHEMA_NAME${currentSchemaVersion + 1}"
 
     // create and call function
     ds.connection.use { conn ->
@@ -80,8 +105,8 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
     // the same as in client part
     val tmp = createTempFile()
     tmp.writeText(String(Base64.decodeBase64(mergeData.csvbase64)))
-    transaction(ds){conn ->
-        conn.createStatement().use{stmt->
+    transaction(ds) { conn ->
+        conn.createStatement().use { stmt ->
             stmt.execute("DROP TABLE IF EXISTS ${newSchema}.${tableName}")
             stmt.execute("""CREATE TABLE IF NOT EXISTS ${newSchema}.${tableName} (
                             id INT PRIMARY KEY NOT NULL,
@@ -100,12 +125,12 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
 
     val dsNew = connectPostgres(postgresHost, postgresPort, databaseName, newSchema, user, password)
     // Select all the newest from log
-    transaction(dsNew) {conn->
-        conn.createStatement().use { stmt->
+    transaction(dsNew) { conn ->
+        conn.createStatement().use { stmt ->
             stmt.executeQuery(
                     """SELECT sql_command FROM LOG 
                        WHERE sync_num > ${mergeData.sync_num}
-                       ORDER BY sync_num, q_id""").use {res ->
+                       ORDER BY sync_num, q_id""").use { res ->
                 while (res.next()) {
                     queries.add(res.getString(1))
                 }
@@ -115,7 +140,7 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
 
     try {
         transaction(dsNew) { conn ->
-            conn.createStatement().use {stmt ->
+            conn.createStatement().use { stmt ->
                 for (sql in queries) {
                     stmt.execute(sql)
                 }
@@ -138,74 +163,12 @@ fun runUpdateRequest(conn: Connection, update: UpdateRequest) {
 }
 
 
-fun updateSyncNum(conn: Connection, syncNum: Int) {
-    conn.prepareStatement("UPDATE SYNCHRONISATION SET sync_num=?").use { stmt ->
-        stmt.setInt(1, syncNum)
-        stmt.execute()
-    }
-}
-
-
-fun getSyncNum(conn: Connection) : Int {
-    conn.createStatement().use { stmt ->
-        stmt.executeQuery("SELECT sync_num FROM SYNCHRONISATION WHERE id=0;").use { res ->
-            res.next()
-            return res.getInt(1)
-        }
-    }
-}
-
-
 fun <T> transaction(ds: HikariDataSource, code: (Connection) -> T): T {
     return ds.connection.use { conn ->
         conn.autoCommit = false
         code(conn).also {
             conn.commit()
             conn.autoCommit = true
-        }
-    }
-}
-
-
-fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
-    ds.connection.use { conn ->
-        conn.autoCommit = false
-        conn.createStatement().use { stmt ->
-            val query =
-                    """
-                    SELECT * FROM $tableName
-                    """
-            stmt.executeQuery(query).use { rs ->
-                val rsmd: ResultSetMetaData = rs.metaData
-
-                val colNames = arrayOfNulls<String>(rsmd.columnCount)
-
-                for (i in 1..rsmd.columnCount) {
-                    colNames[i - 1] = rsmd.getColumnName(i)
-                }
-                val queryByteArray = ByteArrayOutputStream()
-
-                CSVWriter(BufferedWriter(OutputStreamWriter(queryByteArray)),
-                        CSVWriter.DEFAULT_SEPARATOR,
-                        CSVWriter.NO_QUOTE_CHARACTER,
-                        CSVWriter.DEFAULT_ESCAPE_CHARACTER,
-                        CSVWriter.DEFAULT_LINE_END).use { csvWriter ->
-
-                    csvWriter.writeNext(colNames)
-                    while (rs.next()) {
-                        val getLine = arrayOfNulls<String>(rsmd.columnCount)
-                        for (i in 1..rsmd.columnCount) {
-                            getLine[i - 1] = rs.getString(i)
-                        }
-                        csvWriter.writeNext(getLine)
-                    }
-                }
-                val syncNum = getSyncNum(conn)
-                conn.commit()
-                conn.autoCommit = true
-                return jacksonObjectMapper().writeValueAsBytes(ReplicationResponse(
-                        Base64.encodeBase64(queryByteArray.toByteArray()), syncNum))
-            }
         }
     }
 }

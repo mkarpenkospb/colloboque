@@ -9,7 +9,7 @@ private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS LOG(
 
 private const val LOG_QUERY = "INSERT INTO LOG(sync_num, q_id, sql_command, user_id) VALUES (?, ?, ?, ?);"
 
-class Log(ds: HikariDataSource) {
+class ServerLog(ds: HikariDataSource) {
 
     init {
         ds.connection.use { conn ->

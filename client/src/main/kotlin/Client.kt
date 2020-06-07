@@ -4,6 +4,11 @@ import java.sql.DriverManager
 import java.util.*
 
 // ----------------- SQL queries constants ---------------------------
+private const val CREATE_MAIN_TABLE = """CREATE TABLE IF NOT EXISTS MAIN_TABLE(
+                                      id INT PRIMARY KEY NOT NULL, 
+                                      first TEXT NOT NULL,
+                                      last TEXT NOT NULL,
+                                      age INT NOT NULL);"""
 
 private const val CREATE_USER_ID_TABLE = """CREATE TABLE USER_ID(
                                          id INT PRIMARY KEY NOT NULL,      
@@ -29,9 +34,16 @@ class Client (val connectionUrl: String) {
     val httpClient: HttpClient
     val txnManager = TransactionManager(connectionUrl)
     init {
+        // -------------- create main table if not exists ----------------
+        txnManager.transaction {conn->
+            conn.createStatement().use {stmt ->
+                stmt.execute(CREATE_MAIN_TABLE)
+            }
+        }
+
         // ------------------ create user id if not exists -------------------
         txnManager.transaction { conn ->
-            if (!existsTable(conn, "USER_ID")) {
+            if (!existsTable(conn, "USER_ID", null)) {
                 conn.createStatement().use { stmt ->
                     stmt.execute(CREATE_USER_ID_TABLE)
                 }

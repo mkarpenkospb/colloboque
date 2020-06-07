@@ -1,5 +1,6 @@
 rootProject.name = 'colloboque'
 
-include 'client'
-
 include 'backend'
+include 'client'
+include 'collibrary'
+

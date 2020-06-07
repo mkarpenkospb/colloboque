@@ -31,12 +31,12 @@ class ColloboqueClient : CliktCommand() {
 fun actionSimulation(client: Client, serverHost: String, serverPort: Int) {
 
     val queries = listOf(
-            "INSERT INTO TABLE2 (id, first, last, age) VALUES (16, 'Kate', 'Pirson', 25);",
-            "INSERT INTO TABLE2 (id, first, last, age) VALUES (17, 'Anna', 'Pirson', 26);",
-            "INSERT INTO TABLE2 (id, first, last, age) VALUES (18, 'Mary', 'Pirson', 27);"
+            "INSERT INTO MAIN_TABLE (id, first, last, age) VALUES (16, 'Kate', 'Pirson', 25);",
+            "INSERT INTO MAIN_TABLE (id, first, last, age) VALUES (17, 'Anna', 'Pirson', 26);",
+            "INSERT INTO MAIN_TABLE (id, first, last, age) VALUES (18, 'Mary', 'Pirson', 27);"
     )
 
-    client.cloneTable("TABLE2")
+    client.cloneTable("MAIN_TABLE")
 
     client.applyQueries(queries)
 

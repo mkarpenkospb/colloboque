@@ -5,20 +5,22 @@ buildscript {
 
 plugins {
     id 'java'
-    id 'org.jetbrains.kotlin.jvm' version '1.3.70'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.72'
     id 'application'
 }
 
 mainClassName = 'ColloboqueClientKt'
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
+jar.enabled = true
 
 dependencies {
-    testImplementation group:  'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
-    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
+    implementation project(':collibrary')
+
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
     implementation group: 'io.ktor', name: 'ktor-gson', version: "$ktor_version"
     implementation group:'io.ktor', name: 'ktor-client-apache', version: "$ktor_version"
@@ -26,6 +28,11 @@ dependencies {
     implementation group: 'com.h2database', name: 'h2', version: '1.4.200'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.10.2'
     implementation group: 'com.opencsv', name: 'opencsv', version: '4.1'
+    implementation group: 'com.zaxxer', name: 'HikariCP', version: '3.+'
+
+    testImplementation project(':backend')
+    testImplementation group:  'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
 }
 
 compileKotlin {
@@ -34,3 +41,4 @@ compileKotlin {
 compileTestKotlin {
     kotlinOptions.jvmTarget = "11"
 }
+
