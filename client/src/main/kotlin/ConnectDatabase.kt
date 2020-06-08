@@ -28,7 +28,7 @@ fun importTable(client: Client, tableName: String, tableData: ByteArray) {
             stmt.execute("DROP TABLE IF EXISTS $tableName")
             val sql =
                     """
-                     CREATE TABLE IF NOT EXISTS $tableName AS SELECT * FROM CSVREAD('${tmp.absolutePath}');
+                     CREATE TABLE $tableName AS SELECT * FROM CSVREAD('${tmp.absolutePath}');
                     """
             stmt.executeUpdate(sql)
         }

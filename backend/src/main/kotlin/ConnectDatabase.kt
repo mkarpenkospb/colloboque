@@ -11,7 +11,7 @@ import java.sql.Connection.TRANSACTION_SERIALIZABLE
 import java.sql.ResultSetMetaData
 
 
-private const val CALL_FUNCTION = "{call clone_schema(?, ?, true)}"
+private const val CALL_CLONE_SCHEMA = "{call clone_schema(?, ?, true)}"
 private const val BASE_SCHEMA_NAME = "schema"
 
 data class ReplicationResponse(val csvbase64: ByteArray, val sync_num: Int)
@@ -56,10 +56,11 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): I
 // current temporary table name
 fun mergeDataBase(ds: HikariDataSource, postgresHost: String, postgresPort: Int,
                   databaseName: String, currentSchema: String, user: String,
-                  password: String, oldClientTable: ByteArray, tableName: String = "MAIN_TABLE") : HikariDataSource {
+                  password: String, mergeRequestBytes: ByteArray, tableName: String = "MAIN_TABLE") : HikariDataSource {
 
-    val mergeData: MergeRequest = jacksonObjectMapper().readValue(oldClientTable)
-    val queries = mergeData.statements.toMutableList()
+    val mergeData: MergeRequest = jacksonObjectMapper().readValue(mergeRequestBytes)
+    val queriesFromClient = mergeData.statements.toMutableList()
+    val queriesFromLog = mutableListOf<String>()
     val currentSchemaVersion = currentSchema.substring(BASE_SCHEMA_NAME.length).toInt()
     val newSchema = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
 
@@ -68,20 +69,17 @@ fun mergeDataBase(ds: HikariDataSource, postgresHost: String, postgresPort: Int,
         conn.createStatement().use {stmt->
             stmt.execute(CLONE_SCHEMA)
         }
-        conn.prepareCall(CALL_FUNCTION).use { cstmt ->
+        conn.prepareCall(CALL_CLONE_SCHEMA).use { cstmt ->
             cstmt.setString(1, currentSchema)
             cstmt.setString(2, newSchema)
             cstmt.execute()
         }
     }
 
-    // the same as in client part
-    val tmp = createTempFile()
-    tmp.writeText(String(Base64.decodeBase64(mergeData.csvbase64)))
     transaction(ds, ds.schema) {conn ->
         conn.createStatement().use{stmt->
             stmt.execute("DROP TABLE IF EXISTS ${newSchema}.${tableName}")
-            stmt.execute("""CREATE TABLE IF NOT EXISTS ${newSchema}.${tableName} (
+            stmt.execute("""CREATE TABLE ${newSchema}.${tableName} (
                             id INT PRIMARY KEY NOT NULL,
                             first TEXT NOT NULL,
                             last TEXT NOT NULL,
@@ -94,19 +92,18 @@ fun mergeDataBase(ds: HikariDataSource, postgresHost: String, postgresPort: Int,
                         Base64.decodeBase64(mergeData.csvbase64).inputStream()
                 )
     }
-    tmp.delete()
 
     val dsNew = connectPostgres(postgresHost, postgresPort, databaseName, newSchema, user, password)
+
     // Select all the newest from log
     transaction(dsNew, dsNew.schema) {conn->
-        conn.transactionIsolation = TRANSACTION_SERIALIZABLE
         conn.createStatement().use { stmt->
             stmt.executeQuery(
                     """SELECT sql_command FROM LOG 
                        WHERE sync_num > ${mergeData.sync_num}
                        ORDER BY sync_num, q_id""").use {res ->
                 while (res.next()) {
-                    queries.add(res.getString(1))
+                    queriesFromLog.add(res.getString(1))
                 }
             }
         }
@@ -115,8 +112,18 @@ fun mergeDataBase(ds: HikariDataSource, postgresHost: String, postgresPort: Int,
     try {
         transaction(dsNew, dsNew.schema) { conn ->
             conn.transactionIsolation = TRANSACTION_SERIALIZABLE
+
+            transaction(dsNew, dsNew.schema) {connConcurrent ->
+                connConcurrent.transactionIsolation = TRANSACTION_SERIALIZABLE
+                connConcurrent.createStatement().use {stmtConcurrent->
+                    for (sql in queriesFromLog) {
+                        stmtConcurrent.execute(sql)
+                    }
+                }
+            }
+
             conn.createStatement().use {stmt ->
-                for (sql in queries) {
+                for (sql in queriesFromClient) {
                     stmt.execute(sql)
                 }
                 updateSyncNum(conn, getSyncNum(conn) + 1)
