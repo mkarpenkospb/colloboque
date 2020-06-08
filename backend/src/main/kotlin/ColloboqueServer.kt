@@ -18,7 +18,7 @@ class ColloboqueServer : CliktCommand() {
     private val postgresPort by option("--pg-port", help = "Number of the port").int().default(5432)
     private val user by option("--pg-user", help = "Default user name").default("postgres")
     private val password by option("--pg-password", help = "Default password").default("")
-    private val table by option("--table", help = "Default table name").default("BaseTable")
+    private val table by option("--table", help = "Default table name").default("MAIN_TABLE")
     private val currentSchema by option("--pg-schema", help = "Current schema").default("public")
 
     override fun run() {
@@ -33,7 +33,6 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
 
     var ds = connectPostgres(postgresHost, postgresPort, databaseName, currentSchema, user, password)
     val serverLog = Log(ds)
-
     val server = embeddedServer(Netty, port = portNumber) {
         routing {
 
@@ -54,7 +53,7 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
             }
 
             post("/merge") {
-                ds = mergeDataBase(ds, portNumber, postgresHost, postgresPort, databaseName,
+                ds = mergeDataBase(ds, postgresHost, postgresPort, databaseName,
                         currentSchema, user, password, call.receiveChannel().toByteArray())
                 call.respondText(getSyncNum(ds.connection).toString())
             }

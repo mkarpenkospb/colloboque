@@ -7,6 +7,7 @@ import org.postgresql.copy.CopyManager
 import org.postgresql.core.BaseConnection
 import java.io.*
 import java.sql.Connection
+import java.sql.Connection.TRANSACTION_SERIALIZABLE
 import java.sql.ResultSetMetaData
 
 
@@ -27,15 +28,14 @@ fun connectPostgres(host: String, port: Int, dataBase: String, currentSchema: St
     ds.jdbcUrl = "jdbc:postgresql://$host:$port/$dataBase?currentSchema=$currentSchema"
     ds.username = user
     ds.password = password
-
+    ds.schema = currentSchema
     return ds
 }
 
 
 fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): Int {
     val update: UpdateRequest = jacksonObjectMapper().readValue(jsonQueries)
-    var updatedSyncNum = -1
-    ds.connection.use { conn ->
+    return ds.connection.use { conn ->
         conn.autoCommit = false
         val serverSyncNum = getSyncNum(conn)
         if (serverSyncNum == update.sync_num) {
@@ -43,22 +43,20 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): I
             serverLog.writeLog(conn, update)
             conn.commit()
             conn.autoCommit = true
-            updatedSyncNum = update.sync_num + 1
+            update.sync_num + 1
         } else if (serverSyncNum > update.sync_num) {
-            return -2
+            -2
         } else {
-            TODO("Implement this branch too")
+            -1
         }
     }
-    return updatedSyncNum
 }
 
 
 // current temporary table name
-fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
-                  postgresPort: Int, databaseName: String,
-                  currentSchema: String, user: String, password: String,
-                  oldClientTable: ByteArray, tableName: String = "TABLE2") : HikariDataSource {
+fun mergeDataBase(ds: HikariDataSource, postgresHost: String, postgresPort: Int,
+                  databaseName: String, currentSchema: String, user: String,
+                  password: String, oldClientTable: ByteArray, tableName: String = "MAIN_TABLE") : HikariDataSource {
 
     val mergeData: MergeRequest = jacksonObjectMapper().readValue(oldClientTable)
     val queries = mergeData.statements.toMutableList()
@@ -66,7 +64,7 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
     val newSchema = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
 
     // create and call function
-    ds.connection.use { conn ->
+    transaction(ds, ds.schema) { conn ->
         conn.createStatement().use {stmt->
             stmt.execute(CLONE_SCHEMA)
         }
@@ -80,7 +78,7 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
     // the same as in client part
     val tmp = createTempFile()
     tmp.writeText(String(Base64.decodeBase64(mergeData.csvbase64)))
-    transaction(ds){conn ->
+    transaction(ds, ds.schema) {conn ->
         conn.createStatement().use{stmt->
             stmt.execute("DROP TABLE IF EXISTS ${newSchema}.${tableName}")
             stmt.execute("""CREATE TABLE IF NOT EXISTS ${newSchema}.${tableName} (
@@ -93,14 +91,15 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
         CopyManager(conn.unwrap(BaseConnection::class.java))
                 .copyIn(
                         "COPY ${newSchema}.${tableName} FROM STDIN (FORMAT csv, HEADER)",
-                        BufferedReader(FileReader(tmp.absolutePath))
+                        Base64.decodeBase64(mergeData.csvbase64).inputStream()
                 )
     }
     tmp.delete()
 
     val dsNew = connectPostgres(postgresHost, postgresPort, databaseName, newSchema, user, password)
     // Select all the newest from log
-    transaction(dsNew) {conn->
+    transaction(dsNew, dsNew.schema) {conn->
+        conn.transactionIsolation = TRANSACTION_SERIALIZABLE
         conn.createStatement().use { stmt->
             stmt.executeQuery(
                     """SELECT sql_command FROM LOG 
@@ -114,7 +113,8 @@ fun mergeDataBase(ds: HikariDataSource, portNumber: Int, postgresHost: String,
     }
 
     try {
-        transaction(dsNew) { conn ->
+        transaction(dsNew, dsNew.schema) { conn ->
+            conn.transactionIsolation = TRANSACTION_SERIALIZABLE
             conn.createStatement().use {stmt ->
                 for (sql in queries) {
                     stmt.execute(sql)
@@ -156,10 +156,14 @@ fun getSyncNum(conn: Connection) : Int {
 }
 
 
-fun <T> transaction(ds: HikariDataSource, code: (Connection) -> T): T {
+fun <T> transaction(ds: HikariDataSource,schema: String, code: (Connection) -> T): T {
     return ds.connection.use { conn ->
         conn.autoCommit = false
         code(conn).also {
+            conn.prepareStatement("SET search_path = ?").use {stmt ->
+                stmt.setString(1, schema)
+                stmt.execute()
+            }
             conn.commit()
             conn.autoCommit = true
         }

@@ -2,15 +2,13 @@
 // found here:  http://pateldenish.com/2019/08/clone-schema-in-postgres.html
 // repo: https://github.com/denishpatel/pg-clone-schema/commit/62f4063cc014ea3cacb49d83ab7be3a981031706?diff=unified
 
-private const val body = "BODY"
-
 val CLONE_SCHEMA = """
     CREATE OR REPLACE FUNCTION clone_schema(
     source_schema text,
     dest_schema text,
     include_recs boolean)
   RETURNS void AS
-${'$'}${body}${'$'}
+    \$\$
 
 --  This function will clone all sequences, tables, data, views & functions from any existing schema to a new one
 -- SAMPLE CALL:
@@ -186,7 +184,7 @@ BEGIN
 
 END;
 
-${'$'}${body}${'$'}
+\$\$
   LANGUAGE plpgsql VOLATILE
   COST 100;
 """

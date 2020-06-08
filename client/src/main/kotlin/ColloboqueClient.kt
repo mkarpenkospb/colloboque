@@ -12,8 +12,8 @@ import java.net.*
 class ColloboqueClient : CliktCommand() {
 
     private val databaseLocal by option("--h2-database", help = "Path to client h2 database")
-    private val h2Table by option("--h2-table", help = "Name of new table in client database").default("BaseTable")
-    private val pgTable by option("--pg-table", help = "Name of table in server postgres database").default("BaseTable")
+    private val h2Table by option("--h2-table", help = "Name of new table in client database").default("MAIN_TABLE")
+    private val pgTable by option("--pg-table", help = "Name of table in server postgres database").default("MAIN_TABLE")
     private val serverPort by option("--server-port", help = "Number of the server port").int().default(8080)
     private val serverHost by option("--server-host", help = "Server address").default("localhost")
 
