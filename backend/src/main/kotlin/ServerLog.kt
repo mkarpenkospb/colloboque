@@ -1,13 +1,13 @@
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
 
-private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS LOG( 
+private const val CREATE_LOG_TABLE = """CREATE TABLE IF NOT EXISTS control_schema.LOG( 
                                         sync_num INT NOT NULL,
                                         q_id INT NOT NULL,
                                         sql_command TEXT NOT NULL,
                                         user_id TEXT NOT NULL);"""
 
-private const val LOG_QUERY = "INSERT INTO LOG(sync_num, q_id, sql_command, user_id) VALUES (?, ?, ?, ?);"
+private const val LOG_QUERY = "INSERT INTO control_schema.LOG(sync_num, q_id, sql_command, user_id) VALUES (?, ?, ?, ?);"
 
 class ServerLog(ds: HikariDataSource) {
 

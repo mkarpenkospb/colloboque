@@ -21,21 +21,20 @@ class ColloboqueServer : CliktCommand() {
     private val user by option("--pg-user", help = "Default user name").default("postgres")
     private val password by option("--pg-password", help = "Default password").default("")
     private val table by option("--table", help = "Default table name").default("MAIN_TABLE")
-    private val currentSchema by option("--pg-schema", help = "Current schema").default("public")
+
 
     override fun run() {
-        startServer(portNumber, postgresHost, postgresPort, databaseName, currentSchema, user, password, table)
+        startServer(portNumber, postgresHost, postgresPort, databaseName, user, password, table)
     }
-
 }
 
 
+fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int,
+                databaseName: String, user: String, password: String, table: String) {
 
-fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databaseName: String,
-                currentSchema: String, user: String, password: String, table: String) {
-    var ds = connectPostgres(postgresHost, postgresPort, databaseName, currentSchema, user, password)
-    val serverLog = ServerLog(ds)
+    val ds = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
     setUpServer(ds)
+    val serverLog = ServerLog(ds)
     val server = embeddedServer(Netty, port = portNumber) {
         routing {
 
@@ -56,8 +55,7 @@ fun startServer(portNumber: Int, postgresHost: String, postgresPort: Int, databa
 
             post("/merge") {
 
-                ds = mergeDataBase(ds, portNumber, postgresHost, postgresPort, databaseName,
-                        currentSchema, user, password, call.receiveChannel().toByteArray())
+                mergeDataBase(ds, call.receiveChannel().toByteArray())
 
                 call.respondText(getSyncNum(ds.connection).toString())
             }

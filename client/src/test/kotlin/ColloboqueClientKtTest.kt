@@ -44,7 +44,7 @@ internal class ColloboqueClientKtTest {
     class ServerWorkingThread : Thread() {
         override fun run() {
             startServer(portNumber, postgresHost, postgresPort,
-                    databaseName, currentSchema, user,
+                    databaseName, user,
                     password, table)
         }
     }
@@ -53,7 +53,7 @@ internal class ColloboqueClientKtTest {
     @BeforeEach
     fun setUp() {
 
-        serverDataSource = connectPostgres(postgresHost, postgresPort, databaseName, currentSchema, user, password)
+        serverDataSource = connectPostgres(postgresHost, postgresPort, databaseName, user, password)
         clearServer()
 
         // remove all tables
