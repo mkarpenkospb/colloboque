@@ -109,34 +109,28 @@ fun updateDataBase(ds: HikariDataSource, jsonQueries: String, serverLog: Log): I
 
 
 // current temporary table name
-fun mergeDataBase(ds: HikariDataSource, mergeRequestBytes: ByteArray, tableName: String = "MAIN_TABLE") {
+fun mergeDataBase(ds: HikariDataSource, mergeRequestBytes: ByteArray) {
     val mergeData: MergeRequest = jacksonObjectMapper().readValue(mergeRequestBytes)
     val queriesFromClient = mergeData.statements.toMutableList()
     val queriesFromLog = mutableListOf<String>()
+    val currentSchemaVersion = getCurrentSchema(ds.connection).substring(BASE_SCHEMA_NAME.length).toInt()
+    val newSchemaName = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
 
     // create a new empty schema
     transaction(ds) { conn ->
-        val currentSchemaVersion = getCurrentSchema(conn).substring(BASE_SCHEMA_NAME.length).toInt()
-        val newSchemaName = "${BASE_SCHEMA_NAME}${currentSchemaVersion + 1}"
         conn.createStatement().use { stmt ->
             stmt.execute("CREATE SCHEMA $newSchemaName")
         }
-        updateCurrentSchema(conn, newSchemaName);
     }
 
-    transaction(ds) { conn ->
+    transaction(ds, newSchemaName) { conn ->
         conn.createStatement().use { stmt ->
-            stmt.execute("DROP TABLE IF EXISTS $tableName")
-            stmt.execute("""CREATE TABLE $tableName (
-                            id INT PRIMARY KEY NOT NULL,
-                            first TEXT NOT NULL,
-                            last TEXT NOT NULL,
-                            age INT NOT NULL);
-                            """)
+            stmt.execute("DROP TABLE IF EXISTS MAIN_TABLE")
+            stmt.execute(CREATE_MAIN_TABLE)
         }
         CopyManager(conn.unwrap(BaseConnection::class.java))
                 .copyIn(
-                        "COPY $tableName FROM STDIN (FORMAT csv, HEADER)",
+                        "COPY MAIN_TABLE FROM STDIN (FORMAT csv, HEADER)",
                         Base64.decodeBase64(mergeData.csvbase64).inputStream()
                 )
     }
@@ -156,9 +150,9 @@ fun mergeDataBase(ds: HikariDataSource, mergeRequestBytes: ByteArray, tableName:
     }
 
     try {
-        transaction(ds) { conn ->
+        transaction(ds, newSchemaName) { conn ->
             conn.transactionIsolation = TRANSACTION_SERIALIZABLE
-            transaction(ds) { connConcurrent ->
+            transaction(ds, newSchemaName) { connConcurrent ->
                 connConcurrent.transactionIsolation = TRANSACTION_SERIALIZABLE
                 connConcurrent.createStatement().use { stmtConcurrent ->
                     for (sql in queriesFromLog) {
@@ -173,6 +167,7 @@ fun mergeDataBase(ds: HikariDataSource, mergeRequestBytes: ByteArray, tableName:
                 }
                 updateSyncNum(conn, getSyncNum(conn) + 1)
             }
+            updateCurrentSchema(conn, newSchemaName)
         }
     } catch (e: Throwable) {
         TODO("action in case merging failed")
@@ -273,10 +268,7 @@ fun loadTableFromDB(ds: HikariDataSource, tableName: String): ByteArray {
 
 fun existsTable(conn: Connection, tableName: String, schema: String? = null): Boolean {
     val rs = conn.metaData.getTables(null, schema, tableName, null)
-    while (rs.next()) {
-        return true
-    }
-    return false
+    return rs.next()
 }
 
 fun setSchema(conn: Connection, schema: String) {

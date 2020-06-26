@@ -103,10 +103,7 @@ fun getSyncNum(connectionUrl: String): Int {
 
 fun existsTable(conn: Connection, tableName: String): Boolean {
     val rs = conn.metaData.getTables(null, null, tableName, null)
-    while (rs.next()) {
-        return true
-    }
-    return false
+    return rs.next()
 }
 
 class TransactionManager(val connectionUrl: String) {
