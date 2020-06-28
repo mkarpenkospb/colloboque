@@ -44,6 +44,9 @@ fun connectPostgres(host: String, port: Int, dataBase: String, user: String, pas
 }
 
 fun setUpServer(ds: HikariDataSource) {
+
+    TODO("create a table with schema number")
+
     // -------------- create and complete control schema
     transaction(ds, "public") { conn ->
         conn.createStatement().use { stmt ->
